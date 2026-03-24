@@ -1,0 +1,14 @@
+.env
+results/
+k6/scripts/
+k6/screenshots/
+screenshots/
+*.db
+/tmp/
+plan.md
+prd.md
+research.md
+sessions.md
+spec.json
+k6-with-docs
+k6-with-*

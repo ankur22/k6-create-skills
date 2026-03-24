@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "k6": {
+      "type": "local",
+      "command": ["docker", "run", "--rm", "-i", "grafana/mcp-k6"],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}
