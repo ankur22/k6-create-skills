@@ -78,6 +78,7 @@ get_k6_binary() {
     12) echo "$K6_EXTENSIONS" ;;
     13) echo "$K6_SQL_SQLITE" ;;
     14) echo "$K6_NET_EXTENSIONS" ;;
+    20) echo "$K6_EXTENSIONS" ;; # needs xk6-exec for file writes
     *)  echo "$K6_DEFAULT" ;;
   esac
 }
@@ -283,6 +284,10 @@ EOF
 I want you to test https://quickpizza.grafana.com/. Click login. Login with the credentials that are in the page (default/12345678). Click on back to main page. Click on pizza please. Click love it. I want this to be a functional test, so make sure after clicking on love it you see "Rated!". Also ensure that there are screenshots in place after each call API call to capture what has happened.
 EOF
     ;;
+    20) cat <<'EOF'
+We need to create an HTTP K6 test script. It should be one VU, one iteration. Its main job will be to download a binary (from https://github.com/grafana/k6/releases/download/v1.6.1/k6-v1.6.1-linux-amd64.deb) and save it to the local disk.
+EOF
+    ;;
     *) echo "" ;;
   esac
 }
@@ -409,12 +414,9 @@ generate_script() {
   mkdir -p "$out_dir"
   [[ -d "$PROTO_DIR" ]] && cp -r "$PROTO_DIR" "$out_dir/proto"
 
-  # For the xk6docs skill: make k6-with-docs available as ./k6-with-docs
-  # so Step 0 of the skill finds it and uses live doc lookups.
-  if [[ "$skill" == "k6-create-xk6docs" && -f "$K6_WITH_DOCS" && -s "$K6_WITH_DOCS" ]]; then
-    cp "$K6_WITH_DOCS" "$out_dir/k6-with-docs"
-    chmod +x "$out_dir/k6-with-docs"
-  fi
+  # k6 v1.7.0+ auto-provisions the docs subcommand — no binary copy needed.
+  # The agent runs 'k6 x docs --version v1.6.1' and the extension is fetched
+  # from cache automatically. No manual k6-with-docs binary required.
 
   local full_prompt="Load and follow the $skill skill. Then: $prompt"
   opencode run --format json --dir "$out_dir" "$full_prompt" 2>/dev/null
@@ -496,7 +498,21 @@ validate_script_file() {
     cmd="$k6_bin run --vus 1 --iterations 1 $script_file"
   fi
 
-  $cmd >/dev/null 2>&1 && echo "pass" || echo "fail"
+  # Run with the specified binary first; if it fails due to missing extension
+  # dependency (k6/x/*), retry with the full extensions binary.
+  if $cmd >/dev/null 2>&1; then
+    echo "pass"
+  else
+    # Check if the failure is an extension dependency issue
+    local err_out
+    err_out=$($cmd 2>&1 || true)
+    if echo "$err_out" | grep -q "k6/x/" && [[ "$k6_bin" != "$K6_EXTENSIONS" && -f "$K6_EXTENSIONS" ]]; then
+      local ext_cmd="${cmd/$k6_bin/$K6_EXTENSIONS}"
+      $ext_cmd >/dev/null 2>&1 && echo "pass(ext-bin)" || echo "fail"
+    else
+      echo "fail"
+    fi
+  fi
 }
 
 # ── Per-skill worker (runs in background) ────────────────────────────────────
@@ -579,7 +595,7 @@ main() {
   check_deps
   mkdir -p "$RESULTS_DIR" "$SCRIPTS_DIR"
 
-  local scenarios="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19"
+  local scenarios="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20"
   [[ -n "$FILTER_SCENARIO" ]] && scenarios="$FILTER_SCENARIO"
   local skills="k6-create-mcp k6-create-xk6docs"
   [[ -n "$FILTER_SKILL" ]] && skills="$FILTER_SKILL"
