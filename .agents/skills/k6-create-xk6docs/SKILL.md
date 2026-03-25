@@ -158,7 +158,21 @@ $DOCS_CMD using-k6-browser/recommended-practices/simulate-user-input-delay
 WebFetch https://grafana.com/docs/k6/latest/using-k6-browser/recommended-practices/<topic>/
 ```
 
-Key points: prefer `aria-label`/`data-test-*` selectors; use `locator.waitFor()` for dynamic elements; use `page.waitForTimeout()` not `sleep()` for user delays; `page.close()` in `finally`; dismiss cookie banners; avoid high-cardinality tags.
+Key points:
+
+- **Use `getBy*` APIs as the first choice for element selection** — they are more readable and resilient than CSS/XPath strings:
+  - `page.getByRole('button', { name: 'Submit' })` — preferred for interactive elements
+  - `page.getByLabel('Username')` — preferred for form inputs
+  - `page.getByText('Rated!')` — preferred for text content
+  - `page.getByTestId('pizza-btn')` — preferred when `data-testid` attributes exist
+  - `page.getByPlaceholder('Enter email')` — preferred for inputs with placeholders
+  - Fall back to `page.locator('#id')` or `page.locator('[data-test="x"]')` only when no semantic `getBy*` applies
+  - Avoid generic `page.locator('button')` (no context) and absolute XPath
+- **Dynamic elements**: use `locator.waitFor({ state: 'visible' })` after navigation, not just `waitForLoadState()`
+- **User delays**: use `page.waitForTimeout()` not `sleep()` in browser scripts
+- **Page cleanup**: `page.close()` must be in a `finally` block
+- **Cookie banners**: dismiss consent dialogs before interacting
+- **Time series**: avoid high-cardinality tags on browser metrics
 
 If issues found: fix and re-validate. Minor style issues: note but do not re-validate.
 
