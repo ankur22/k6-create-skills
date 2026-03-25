@@ -103,7 +103,9 @@ If validation fails: read stderr, fix the root cause, retry up to **3 attempts**
 
 ## Step 6: Best-practices review
 
-If `./k6-with-docs x docs best-practices` is available, run it and review the script against the output. Otherwise, check the following directly:
+### General checks (all scripts)
+
+If `./k6-with-docs x docs best-practices` is available, run it and review the script against the output. Otherwise check directly:
 
 - `export const options` with realistic VUs/duration and `thresholds` defined
 - `sleep()` between iterations for load tests (skip for browser/functional scripts)
@@ -113,8 +115,32 @@ If `./k6-with-docs x docs best-practices` is available, run it and review the sc
 - No `let`/`var` at top level (use `const`; mutable globals contaminate across VUs)
 - No deprecated imports (`k6/ws` → `k6/experimental/websockets`)
 
-If there are issues: fix them, re-validate, then continue.
-If only minor style issues: note them in the output but do not re-validate.
+### Browser scripts — fetch the full recommended practices
+
+If the script imports `k6/browser`, look up each of the following topics and
+review the generated script against them:
+
+```
+./k6-with-docs x docs using-k6-browser/recommended-practices/select-elements
+./k6-with-docs x docs using-k6-browser/recommended-practices/handle-dynamic-elements
+./k6-with-docs x docs using-k6-browser/recommended-practices/sleep-vs-page-wait-for-timeout
+./k6-with-docs x docs using-k6-browser/recommended-practices/clean-up-test-resources-page-close
+./k6-with-docs x docs using-k6-browser/recommended-practices/prevent-cookie-banners-blocking
+./k6-with-docs x docs using-k6-browser/recommended-practices/prevent-too-many-time-series-error
+./k6-with-docs x docs using-k6-browser/recommended-practices/hybrid-approach-to-performance
+./k6-with-docs x docs using-k6-browser/recommended-practices/page-object-model-pattern
+./k6-with-docs x docs using-k6-browser/recommended-practices/simulate-user-input-delay
+```
+
+Key points to check:
+- **Selectors**: prefer `aria-label`, `data-test-*`, or XPath text over generic tags or class names
+- **Dynamic elements**: use `locator.waitFor()` after navigation, not just `waitForLoadState()`
+- **sleep vs waitForTimeout**: use `page.waitForTimeout()` to simulate user delays in browser scripts; `sleep()` blocks the event loop
+- **Page cleanup**: `page.close()` must be in a `finally` block, never in a conditional path
+- **Cookie banners**: dismiss consent dialogs before interacting if the site shows them
+- **Time series**: avoid tagging browser metrics with high-cardinality values
+
+If issues are found: fix and re-validate. Minor style issues: note but do not re-validate.
 
 ---
 

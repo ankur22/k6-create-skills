@@ -10,6 +10,17 @@
  * - Do NOT use --vus or --iterations CLI flags — the options.scenarios block
  *   controls load for browser scripts.
  * - browser options go inside the scenario, not at the top level.
+ *
+ * BROWSER BEST PRACTICES (look up via k6 x docs before reviewing a script):
+ *   ./k6-with-docs x docs using-k6-browser/recommended-practices/select-elements
+ *   ./k6-with-docs x docs using-k6-browser/recommended-practices/handle-dynamic-elements
+ *   ./k6-with-docs x docs using-k6-browser/recommended-practices/sleep-vs-page-wait-for-timeout
+ *   ./k6-with-docs x docs using-k6-browser/recommended-practices/clean-up-test-resources-page-close
+ *   ./k6-with-docs x docs using-k6-browser/recommended-practices/prevent-cookie-banners-blocking
+ *   ./k6-with-docs x docs using-k6-browser/recommended-practices/prevent-too-many-time-series-error
+ *   ./k6-with-docs x docs using-k6-browser/recommended-practices/hybrid-approach-to-performance
+ *   ./k6-with-docs x docs using-k6-browser/recommended-practices/page-object-model-pattern
+ *   ./k6-with-docs x docs using-k6-browser/recommended-practices/simulate-user-input-delay
  */
 import { browser } from 'k6/browser';
 import { check } from 'k6';
