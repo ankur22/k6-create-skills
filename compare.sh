@@ -414,12 +414,9 @@ generate_script() {
   mkdir -p "$out_dir"
   [[ -d "$PROTO_DIR" ]] && cp -r "$PROTO_DIR" "$out_dir/proto"
 
-  # For the xk6docs skill: make k6-with-docs available as ./k6-with-docs
-  # so Step 0 of the skill finds it and uses live doc lookups.
-  if [[ "$skill" == "k6-create-xk6docs" && -f "$K6_WITH_DOCS" && -s "$K6_WITH_DOCS" ]]; then
-    cp "$K6_WITH_DOCS" "$out_dir/k6-with-docs"
-    chmod +x "$out_dir/k6-with-docs"
-  fi
+  # k6 v1.7.0+ auto-provisions the docs subcommand — no binary copy needed.
+  # The agent runs 'k6 x docs --version v1.6.1' and the extension is fetched
+  # from cache automatically. No manual k6-with-docs binary required.
 
   local full_prompt="Load and follow the $skill skill. Then: $prompt"
   opencode run --format json --dir "$out_dir" "$full_prompt" 2>/dev/null

@@ -1,18 +1,26 @@
 # k6 Docs Lookup Guidance
 
 Use this file when you need to look up k6 documentation with the docs subcommand.
-The docs binary is either `k6 x docs` or `./k6-with-docs x docs` — use whichever
-worked in Step 0 of the skill.
+`DOCS_CMD` was set in Step 0. Substitute it below.
+
+As of **k6 v1.7.0** the subcommand auto-provisions — no manual build needed.
+The `--version v1.6.1` flag is required until the v1.7.x doc bundle ships.
 
 ---
 
 ## Commands
 
 ```
-<binary> x docs                        # overview of all topics
-<binary> x docs <path>                 # read a topic; shows content + subtopics at the bottom
-<binary> x docs <path> --depth 2      # read a topic + 2 levels of subtopics in one call
-<binary> x docs search <term>         # fuzzy search; returns matching paths
+$DOCS_CMD                        # overview of all topics
+$DOCS_CMD <path>                 # read a topic; shows content + subtopics at the bottom
+$DOCS_CMD <path> --depth 2      # read a topic + 2 levels of subtopics in one call
+$DOCS_CMD search <term>         # fuzzy search; returns matching paths
+```
+
+If `DOCS_CMD` is `k6 x docs --version v1.6.1`, append the path after the flag:
+```
+k6 x docs --version v1.6.1 javascript-api/k6-http
+k6 x docs --version v1.6.1 search websocket
 ```
 
 Paths use spaces or slashes interchangeably.
@@ -55,4 +63,4 @@ API — no need to read individual method sub-pages.
 | Checks | `using-k6 checks` |
 | Test lifecycle | `using-k6 test-lifecycle` |
 | Cloud run | `cloud` |
-| Best practices | `<binary> x docs best-practices` |
+| Best practices | `$DOCS_CMD best-practices` |
