@@ -9,22 +9,33 @@ compatibility: opencode
 
 ## Step 0: Establish your docs command (do this first, every time)
 
-As of **k6 v1.7.0**, the docs subcommand is auto-provisioned — no manual binary build required. Run:
+As of **k6 v1.7.0**, the docs subcommand is auto-provisioned — no manual binary build required. Try in order:
 
+**1. Try without a version flag first (preferred — uses the bundle matching your k6 version):**
+```bash
+k6 x docs 2>&1 | head -1
+```
+
+**2. If that returns a 404 error, fall back to the previous version:**
 ```bash
 k6 x docs --version v1.6.1 2>&1 | head -1
 ```
 
-> **Note:** The `--version v1.6.1` flag is required until the v1.7.x doc bundle is published.
+**3. If neither works (older k6 binary), try the locally-built binary:**
+```bash
+./k6-with-docs x docs 2>&1 | head -1
+```
+
 > k6 v1.7.0 auto-downloads the docs binary on first run (~30s); subsequent calls are instant from cache.
 
-Set `DOCS_CMD` based on the result:
+Set `DOCS_CMD` to the first command that returns a topic list:
 
-| Result | `DOCS_CMD` | Notes |
-|--------|-----------|-------|
-| Returns a topic list | `k6 x docs --version v1.6.1` | Standard path — use this for all lookups |
-| Fails (older k6) | Try `./k6-with-docs x docs` (local binary). Read `docs-guidance.md`. | |
-| Both fail | **Web fallback** via `WebFetch` against `https://grafana.com/docs/k6/latest/`. Read `SETUP.md`. | |
+| Result | `DOCS_CMD` |
+|--------|-----------|
+| Step 1 succeeds | `k6 x docs` |
+| Step 1 fails with 404, Step 2 succeeds | `k6 x docs --version v1.6.1` |
+| Only Step 3 works | `./k6-with-docs x docs` |
+| All fail | **Web fallback** via `WebFetch` against `https://grafana.com/docs/k6/latest/`. Read `SETUP.md`. |
 
 Do not skip doc lookups — use web fallback if the subcommand is unavailable.
 

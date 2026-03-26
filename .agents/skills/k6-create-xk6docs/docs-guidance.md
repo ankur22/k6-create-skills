@@ -1,10 +1,7 @@
 # k6 Docs Lookup Guidance
 
 Use this file when you need to look up k6 documentation with the docs subcommand.
-`DOCS_CMD` was set in Step 0. Substitute it below.
-
-As of **k6 v1.7.0** the subcommand auto-provisions — no manual build needed.
-The `--version v1.6.1` flag is required until the v1.7.x doc bundle ships.
+`DOCS_CMD` was set in Step 0 — substitute it in the commands below.
 
 ---
 
@@ -17,7 +14,7 @@ $DOCS_CMD <path> --depth 2      # read a topic + 2 levels of subtopics in one ca
 $DOCS_CMD search <term>         # fuzzy search; returns matching paths
 ```
 
-If `DOCS_CMD` is `k6 x docs --version v1.6.1`, append the path after the flag:
+If `DOCS_CMD` includes a `--version` flag, append the path after all flags:
 ```
 k6 x docs --version v1.6.1 javascript-api/k6-http
 k6 x docs --version v1.6.1 search websocket
