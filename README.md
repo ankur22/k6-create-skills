@@ -20,11 +20,11 @@ The agent works from built-in example scripts and uses `k6 x docs` to fill any g
 
 **Requires:** k6 v1.7.0+ (auto-provisions the docs subcommand on first use — no manual build):
 ```bash
-k6 x docs --version v1.6.1   # works out of the box with k6 v1.7.0+
+k6 x docs   # works out of the box with k6 v1.7.0+
 ```
 
-> **Note:** `--version v1.6.1` is required until the v1.7.x doc bundle is published.
 > On first run k6 auto-downloads the extension binary (~30s), then serves from cache.
+> If you get a 404 error, fall back to `k6 x docs --version v1.6.1`.
 
 If you're on an older k6, build the binary manually:
 ```bash
