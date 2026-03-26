@@ -33,7 +33,20 @@ xk6 build --with github.com/grafana/xk6-subcommand-docs@latest -o ./k6-with-docs
 
 ## Install
 
-Copy the skills into your OpenCode skills directory:
+**Via [skills.sh](https://skills.sh) (recommended):**
+
+```bash
+# Install both skills
+npx skills add ankur22/k6-create-skills
+
+# Install the xk6docs skill only
+npx skills add ankur22/k6-create-skills --skill k6-create-xk6docs
+
+# Install the mcp skill only
+npx skills add ankur22/k6-create-skills --skill k6-create-mcp
+```
+
+**Manually:**
 
 ```bash
 cp -r .agents/skills/k6-create-mcp     ~/.agents/skills/
