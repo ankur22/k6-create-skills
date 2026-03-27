@@ -114,11 +114,26 @@ Common web URL patterns: `https://grafana.com/docs/k6/latest/<path>/`
 mkdir -p k6/scripts
 ```
 
-Before writing the file, get the current UTC timestamp and substitute it into the script's `{{GENERATED_AT}}` placeholder on line 1:
+Before writing the file, get the current UTC timestamp by trying these commands in order — use the output of the first one that succeeds:
 
 ```bash
+# 1. Node.js (most developer machines)
+node -e "console.log(new Date().toISOString())"
+
+# 2. Python 3
 python3 -c "import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z'))"
+
+# 3. Perl (pre-installed on macOS and most Linux)
+perl -e 'use POSIX; use Time::HiRes qw(gettimeofday); my($s,$u)=gettimeofday(); printf POSIX::strftime("%Y-%m-%dT%H:%M:%S.",gmtime($s)).sprintf("%03dZ",$u/1000)'
+
+# 4. PowerShell (Windows)
+powershell -Command "[DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')"
+
+# 5. Last resort — BSD date (macOS/Linux, no real milliseconds)
+date -u +"%Y-%m-%dT%H:%M:%S.000Z"
 ```
+
+> **Note:** Do NOT use `date -u +"%Y-%m-%dT%H:%M:%S.%3NZ"` — `%3N` is Linux-only and produces literal `3NZ` on macOS.
 
 Replace `{{GENERATED_AT}}` on line 1 of the script with the timestamp output. The result should read:
 
