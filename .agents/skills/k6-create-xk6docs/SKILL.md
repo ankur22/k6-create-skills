@@ -198,15 +198,40 @@ WebFetch https://grafana.com/docs/k6/latest/using-k6-browser/recommended-practic
 
 Key points:
 
-- **Use `getBy*` APIs as the first choice for element selection** — they are more readable and resilient than CSS/XPath strings:
+- **Use `getBy*` APIs as the first choice for element selection** — more readable and resilient than CSS/XPath:
   - `page.getByRole('button', { name: 'Submit' })` — preferred for interactive elements
   - `page.getByLabel('Username')` — preferred for form inputs
   - `page.getByText('Rated!')` — preferred for text content
   - `page.getByTestId('pizza-btn')` — preferred when `data-testid` attributes exist
   - `page.getByPlaceholder('Enter email')` — preferred for inputs with placeholders
-  - Fall back to `page.locator('#id')` or `page.locator('[data-test="x"]')` only when no semantic `getBy*` applies
+  - Fall back to `page.locator('#id')` or `page.locator('[data-test="x"]')` only when no `getBy*` applies
   - Avoid generic `page.locator('button')` (no context) and absolute XPath
-- **Dynamic elements**: use `locator.waitFor({ state: 'visible' })` after navigation, not just `waitForLoadState()`
+
+- **Locator actionability — no `waitFor()` before interactions:**
+  Locator APIs (`click()`, `fill()`, `selectOption()`, etc.) have built-in actionability checks. They automatically wait for the element to be visible, enabled, and stable. **Do not call `waitFor()` before an action** — it is redundant and adds unnecessary coupling.
+  ```javascript
+  // ✅ correct — actionability check is built in
+  await page.getByRole('button', { name: 'Submit' }).click();
+
+  // ❌ wrong — waitFor() before an interaction is redundant
+  await page.getByRole('button', { name: 'Submit' }).waitFor({ state: 'visible' });
+  await page.getByRole('button', { name: 'Submit' }).click();
+  ```
+  `waitFor()` is only appropriate when asserting an element's state **without** interacting with it (e.g., checking that a confirmation message appeared).
+
+- **No `waitForLoadState()` after navigation or clicks:**
+  Do not call `waitForLoadState()` after `page.goto()` or after clicking a link/button. Instead, interact directly with the first element you expect on the new page — the locator's actionability checks handle the waiting automatically.
+  ```javascript
+  // ✅ correct — just interact with what you expect next
+  await page.goto('https://example.com/login');
+  await page.getByLabel('Username').fill('user');
+
+  // ❌ wrong — waitForLoadState adds a slow, brittle wait
+  await page.goto('https://example.com/login');
+  await page.waitForLoadState('networkidle');
+  await page.getByLabel('Username').fill('user');
+  ```
+
 - **User delays**: use `page.waitForTimeout()` not `sleep()` in browser scripts
 - **Page cleanup**: `page.close()` must be in a `finally` block
 - **Cookie banners**: dismiss consent dialogs before interacting
