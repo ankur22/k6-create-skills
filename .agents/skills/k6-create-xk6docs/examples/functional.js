@@ -16,6 +16,13 @@
  *                          toHaveText, toContainText, toHaveAttribute, toHaveValue,
  *                          toHaveTitle (on page objects)
  *   Non-throwing:          expect.soft(value).toEqual(...) — collects all failures
+ *
+ * LOCATOR ACTIONABILITY:
+ *   - Do NOT call waitFor() before interacting (click, fill, select). Locators
+ *     automatically wait for visibility, enabled state, and stability.
+ *   - Only use waitFor() when asserting an element state WITHOUT interacting with it.
+ *   - Do NOT use waitForLoadState(). Interact directly with the next element you
+ *     expect — actionability checks handle the waiting.
  */
 import { expect } from 'https://jslib.k6.io/k6-testing/0.6.1/index.js';
 import { browser } from 'k6/browser';
@@ -61,18 +68,19 @@ export async function browserTest() {
   const page = await browser.newPage();
 
   try {
+    // Navigate — no waitForLoadState(). Interact directly with elements
+    // on the new page; actionability checks handle the waiting.
     await page.goto(BASE_URL);
 
-    // Page-level retrying assertion
+    // Page-level retrying assertion (not an interaction — waitFor is via expect)
     await expect(page).toHaveTitle(/QuickPizza/);
 
-    // Element-level retrying assertions
-    await expect(page.locator('body')).toBeVisible();
+    // Click directly — no waitFor() needed before interacting with a locator.
+    // getByRole automatically waits for the button to be visible and enabled.
+    await page.getByRole('button', { name: 'Pizza, Please!' }).click();
 
-    // Click and verify result appears
-    const btn = page.locator('button').first();
-    await expect(btn).toBeVisible();
-    await btn.click();
+    // Assert the result appeared (not interacting — waitFor via expect is correct)
+    await expect(page.getByText('Our recommendation:')).toBeVisible();
 
   } finally {
     await page.close();

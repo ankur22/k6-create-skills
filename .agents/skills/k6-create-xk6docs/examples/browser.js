@@ -3,7 +3,7 @@
  * k6 browser example — k6/browser
  *
  * Covers: browser.newPage(), goto(), getBy* APIs, locator(), click(),
- *         waitFor(), waitForLoadState(), check(), try/finally page.close(),
+ *         check(), try/finally page.close(),
  *         shared-iterations scenario with browser options
  *
  * ELEMENT SELECTION — use getBy* APIs as the first choice:
@@ -17,6 +17,16 @@
  *   page.locator('button[type="submit"]')          ← fallback: unambiguous attribute
  *   page.locator('button').first()                 ← last resort only — no context
  *   page.locator('//xpath')                        ← avoid: fragile, hard to read
+ *
+ * LOCATOR ACTIONABILITY — locator APIs have built-in actionability checks:
+ *   - Do NOT call waitFor() before interacting with an element (click, fill, etc.).
+ *     The locator will automatically wait for the element to be visible, enabled,
+ *     and stable before performing the action.
+ *   - Only use waitFor() when you need to wait for an element WITHOUT interacting
+ *     with it (e.g. asserting it appears after an async operation).
+ *   - Do NOT use waitForLoadState() after navigation or clicks. Instead, interact
+ *     directly with the next element you expect to appear — the locator's
+ *     actionability checks handle the waiting for you.
  *
  * IMPORTANT:
  * - Default function MUST be async.
@@ -56,24 +66,23 @@ export default async function () {
   const page = await browser.newPage();
 
   try {
+    // Navigate to the page — no waitForLoadState needed after goto().
+    // Just start interacting with the first element you expect on the page.
     await page.goto('https://quickpizza.grafana.com');
-    await page.waitForLoadState('networkidle');
 
-    // ── getByRole: preferred for buttons, links, headings, inputs ────────────
-    // Matches by ARIA role + accessible name — resilient to DOM restructuring.
-    const pizzaBtn = page.getByRole('button', { name: 'Pizza, Please!' });
-    await pizzaBtn.waitFor({ state: 'visible', timeout: 5000 });
-    await pizzaBtn.click();
-    await page.waitForLoadState('networkidle');
+    // ── Interacting with elements ─────────────────────────────────────────────
+    // No waitFor() before click() — locators automatically wait for the element
+    // to be visible, enabled, and stable before performing the action.
+    await page.getByRole('button', { name: 'Pizza, Please!' }).click();
 
-    // ── getByText: preferred for asserting visible text ───────────────────────
-    const recommendation = page.getByText('Our recommendation:');
-    await recommendation.waitFor({ state: 'visible', timeout: 10000 });
-
-    // ── getByRole again for the rating button ─────────────────────────────────
+    // No waitForLoadState() after click() — just interact with the next element
+    // you expect. If the recommendation card appears asynchronously, the locator
+    // will wait for it automatically.
     await page.getByRole('button', { name: 'Love it!' }).click();
 
-    // ── getByText to assert transient confirmation ────────────────────────────
+    // ── Asserting without interacting ─────────────────────────────────────────
+    // waitFor() IS appropriate here: we're asserting an element appears but
+    // not clicking/filling it. Use it to confirm async state changes.
     const rated = page.getByText('Rated!');
     await rated.waitFor({ state: 'visible', timeout: 5000 });
 
@@ -84,7 +93,7 @@ export default async function () {
     // ── Fallback to locator() only when no getBy* applies ────────────────────
     // e.g. stable ID or unambiguous attribute selector:
     // const input = page.locator('#username');
-    // const submit = page.locator('button[type="submit"]');
+    // await input.fill('myuser');  // no waitFor() needed before fill()
 
   } finally {
     // Always close the page — even if the test throws
