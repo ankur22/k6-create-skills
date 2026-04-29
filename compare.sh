@@ -3,8 +3,8 @@
 #
 # Usage:
 #   ./compare.sh                   Run all scenarios against both skills
-#   ./compare.sh --scenario N      Run only scenario N (1-18)
-#   ./compare.sh --skill NAME      Run only one skill (k6-create-mcp or k6-create-xk6docs)
+#   ./compare.sh --scenario N      Run only scenario N (1-30)
+#   ./compare.sh --skill NAME      Run only one skill (k6-create-mcp, k6-create-xk6docs, or grafana-k6)
 #   ./compare.sh --help            Show this help
 #
 # Requirements:
@@ -38,8 +38,20 @@
 #   S14: xk6-dns + xk6-tls + xk6-tcp (infrastructure checks for quickpizza.grafana.com)
 #   S15: Dinner-time peak ramping-vus (realistic takeaway load pattern)
 #   S16: Constant arrival rate (constant-arrival-rate executor, 20 RPS)
-#   S17: k6 cloud run script (generate only, ext.loadimpact options)
+#   S17: k6 cloud run script (generate only, cloud options)
 #   S18: k6 cloud run --local-execution (hybrid, generate only)
+#   S19: Browser login flow (functional test with screenshots)
+#   S20: Binary file download (save to disk via xk6-exec)
+#   S21: Smoke test (1 VU, 1 iteration, minimal)
+#   S22: Environment variable parameterization
+#   S23: CSV data-driven test (SharedArray, inline CSV)
+#   S24: Groups and tags (synchronous HTTP only)
+#   S25: Batch parallel requests (http.batch)
+#   S26: Spike test (sudden traffic surge, ramping-vus)
+#   S27: File upload (multipart form data)
+#   S28: Custom handleSummary (multi-format export)
+#   S29: Thresholds with abortOnFail
+#   S30: Multi-stage stress test (breaking point)
 #
 # Output: results/comparison-<timestamp>.md
 
@@ -263,7 +275,7 @@ EOF
     ;;
     17) cat <<'EOF'
 Create a k6 cloud run script for QuickPizza that includes the cloud-specific options needed for k6 cloud run. The script should:
-1. Export options with ext.loadimpact configuration: projectID: 1234567 (placeholder), name: 'QuickPizza Cloud Load Test', and a multi-region distribution with 60% in 'amazon:us:ashburn' and 40% in 'amazon:eu:dublin'
+1. Export options with a top-level cloud configuration block: projectID: 1234567 (placeholder), name: 'QuickPizza Cloud Load Test', and a multi-region distribution with 60% in 'amazon:us:ashburn' and 40% in 'amazon:eu:dublin'
 2. Use a ramping-vus scenario with stages: ramp to 50 VUs over 2 minutes, hold for 5 minutes, ramp down to 0 over 1 minute
 3. Test https://quickpizza.grafana.com/api/quotes with check() and p(95) threshold
 4. Add a comment at the top explaining how to run: 'k6 cloud login --token <TOKEN>' then 'k6 cloud run script.js'
@@ -272,7 +284,7 @@ EOF
     ;;
     18) cat <<'EOF'
 Create a k6 cloud run --local-execution script for QuickPizza. This runs the test locally but streams results to Grafana Cloud. The script should:
-1. Include the same ext.loadimpact options as a cloud run script: projectID: 1234567, name: 'QuickPizza Hybrid Test'
+1. Include the same top-level cloud options as a cloud run script: projectID: 1234567, name: 'QuickPizza Hybrid Test'
 2. Use a constant-arrival-rate scenario: 15 RPS for 3 minutes, preAllocatedVUs: 30, maxVUs: 100
 3. Test POST /api/pizza at https://quickpizza.grafana.com with Authorization: Token 'abc1234567890123' (16 chars), check status 200
 4. Add a comment at the top: to run: 'k6 cloud login --token <TOKEN>' then 'k6 cloud run --local-execution script.js'
@@ -286,6 +298,132 @@ EOF
     ;;
     20) cat <<'EOF'
 We need to create an HTTP K6 test script. It should be one VU, one iteration. Its main job will be to download a binary (from https://github.com/grafana/k6/releases/download/v1.6.1/k6-v1.6.1-linux-amd64.deb) and save it to the local disk.
+EOF
+    ;;
+    21) cat <<'EOF'
+Create a minimal k6 smoke test for https://quickpizza.grafana.com/api/quotes. Use 1 VU, 1 iteration (via options, not CLI flags). GET the endpoint, check status 200 and that the response body is valid JSON. Add a threshold: p(95) http_req_duration under 1000ms. No sleep needed — this is a single-iteration smoke test. Save to k6/scripts/quickpizza-smoke.js.
+EOF
+    ;;
+    22) cat <<'EOF'
+Create a k6 script that reads configuration from environment variables. The script should:
+1. Read __ENV.BASE_URL (default to 'https://quickpizza.grafana.com' if not set)
+2. Read __ENV.AUTH_TOKEN (default to 'abc1234567890123' if not set)
+3. Read __ENV.TARGET_VUS (parse as integer, default to 5)
+4. Use these in a load test: GET ${BASE_URL}/api/quotes with Authorization: Token header
+5. Also GET ${BASE_URL}/api/names
+6. check() both responses for status 200
+7. Add thresholds: p(95) http_req_duration < 500ms, http_req_failed rate < 1%
+8. Use the VU count from __ENV.TARGET_VUS in options
+9. Duration: 30 seconds, sleep(1) between iterations
+Save to k6/scripts/quickpizza-env-params.js.
+EOF
+    ;;
+    23) cat <<'EOF'
+Create a k6 data-driven test using SharedArray with inline CSV data (not a file). The script should:
+1. Import { SharedArray } from 'k6/data'
+2. Define a SharedArray named 'endpoints' that returns an array of objects parsed from an inline CSV string using split/map (not papaparse). The CSV data:
+   path,expected_status,description
+   /api/quotes,200,Get pizza quotes
+   /api/names,200,Get pizza names
+   /api/adjectives,200,Get pizza adjectives
+3. In each iteration, pick an endpoint using __VU and __ITER modulo the array length
+4. Fetch https://quickpizza.grafana.com + the picked path
+5. check() that status matches expected_status from the data row
+6. Log the description field
+7. Use 3 VUs for 30 seconds. Add thresholds: p(95) http_req_duration < 500ms. Include sleep(1).
+Save to k6/scripts/quickpizza-data-driven.js.
+EOF
+    ;;
+    24) cat <<'EOF'
+Create a k6 load test for https://quickpizza.grafana.com that uses group() to organize requests and custom tags for filtering. IMPORTANT: group() only works in synchronous contexts — do NOT use it with browser or async APIs. The script should:
+1. Import { group } from 'k6' and http from 'k6/http'
+2. group('read_operations', () => { ... }) containing:
+   - GET /api/quotes with tags: { name: 'quotes', operation: 'read' }
+   - GET /api/names with tags: { name: 'names', operation: 'read' }
+   - check() both for status 200
+3. group('write_operations', () => { ... }) containing:
+   - POST /api/pizza with Authorization: Token 'abc1234567890123', Content-Type: application/json, body: null
+   - Tag with { name: 'pizza', operation: 'write' }
+   - check() for status 200
+4. Add tag-based thresholds: 'http_req_duration{operation:read}': ['p(95)<300'], 'http_req_duration{operation:write}': ['p(95)<800']
+5. Use 5 VUs for 30 seconds. Include sleep(1).
+Save to k6/scripts/quickpizza-groups-tags.js.
+EOF
+    ;;
+    25) cat <<'EOF'
+Create a k6 script that uses http.batch() to send parallel requests to https://quickpizza.grafana.com. The script should:
+1. Use http.batch() to send 5 requests in parallel:
+   - GET /api/quotes
+   - GET /api/names
+   - GET /api/adjectives
+   - GET /api/quotes (second call)
+   - GET /api/names (second call)
+2. The batch call should use the array-of-arrays format: [['GET', url], ['GET', url], ...]
+3. check() that all 5 responses have status 200
+4. Add a custom Trend metric named 'batch_duration' that records the total time for the batch (measure Date.now() before and after)
+5. Add thresholds: p(95) http_req_duration < 500ms, http_req_failed rate < 1%, batch_duration p(95) < 1000
+6. Use 5 VUs for 30 seconds. Include sleep(1).
+Save to k6/scripts/quickpizza-batch.js.
+EOF
+    ;;
+    26) cat <<'EOF'
+Create a k6 spike test for https://quickpizza.grafana.com/api/quotes simulating a sudden traffic surge. Use a ramping-vus executor with these stages:
+- 10 seconds at 2 VUs (normal baseline)
+- 10 seconds ramp to 200 VUs (instant spike)
+- 30 seconds hold at 200 VUs (sustained spike)
+- 10 seconds ramp down to 2 VUs (traffic drops)
+- 30 seconds hold at 2 VUs (recovery)
+- 10 seconds ramp to 0 (end)
+Each iteration: GET /api/quotes, check status 200, check response contains 'quotes'. Add thresholds: p(95) http_req_duration < 2000ms (relaxed for spike), http_req_failed rate < 5%. Include sleep(0.5) for tight iteration pacing. Save to k6/scripts/quickpizza-spike.js.
+EOF
+    ;;
+    27) cat <<'EOF'
+Create a k6 script that uploads a file to https://quickpizza.grafana.com via multipart form data. The script should:
+1. Use open() in init context to load a small text file. Since we don't have a real file, create one first: the script should use a setup-generated approach — but since open() only works in init, generate the bytes inline: const fileData = 'name,rating\nMargherita,5\nPepperoni,4\nHawaiian,3\n'
+2. Use http.file(fileData, 'ratings.csv', 'text/csv') to create a file object
+3. POST to https://quickpizza.grafana.com/api/ratings with the file as multipart form data, plus a field 'description' with value 'Pizza ratings upload'
+4. check() that the response status is one of [200, 201, 400, 404] (the endpoint may not accept uploads, but the script must be valid k6)
+5. Add thresholds: p(95) http_req_duration < 2000ms
+6. Use 2 VUs for 20 seconds. Include sleep(1).
+Save to k6/scripts/quickpizza-file-upload.js.
+EOF
+    ;;
+    28) cat <<'EOF'
+Create a k6 script that implements a custom handleSummary to export results in multiple formats. The script should:
+1. GET https://quickpizza.grafana.com/api/quotes, check status 200
+2. Add a custom Counter named 'successful_requests' — increment on status 200
+3. Use 3 VUs for 20 seconds. Add thresholds: p(95) http_req_duration < 500ms
+4. Implement handleSummary(data) that returns an object with:
+   - 'stdout': a human-readable text summary showing total requests, success rate, p95 latency, and threshold pass/fail
+   - '/tmp/quickpizza-summary.json': JSON.stringify(data) for the full raw summary
+5. The stdout summary should format nicely with headers and aligned values, not just dump JSON
+6. Include sleep(1).
+Save to k6/scripts/quickpizza-custom-summary.js.
+EOF
+    ;;
+    29) cat <<'EOF'
+Create a k6 script that uses thresholds with abortOnFail to stop the test early if performance degrades. The script should:
+1. GET https://quickpizza.grafana.com/api/quotes
+2. check() status 200 and response body contains 'quotes'
+3. Define thresholds with abortOnFail:
+   - http_req_duration: [{ threshold: 'p(99)<3000', abortOnFail: true, delayAbortEval: '10s' }]
+   - http_req_failed: [{ threshold: 'rate<0.1', abortOnFail: true, delayAbortEval: '10s' }]
+   - checks: [{ threshold: 'rate>0.9', abortOnFail: true, delayAbortEval: '10s' }]
+4. Also add non-aborting thresholds: p(95) http_req_duration < 500ms
+5. Use a ramping-vus scenario: ramp from 0 to 10 VUs over 30s, hold at 10 for 1 minute, ramp to 0 over 30s
+6. Include sleep(1).
+Save to k6/scripts/quickpizza-abort-thresholds.js.
+EOF
+    ;;
+    30) cat <<'EOF'
+Create a k6 multi-stage stress test for https://quickpizza.grafana.com to find the breaking point. Use a ramping-vus executor with stages:
+- 2 minutes ramp to 10 VUs (warm-up)
+- 3 minutes ramp to 50 VUs (normal load)
+- 3 minutes ramp to 100 VUs (heavy load)
+- 3 minutes ramp to 200 VUs (stress)
+- 3 minutes ramp to 300 VUs (breaking point)
+- 5 minutes ramp to 0 (recovery)
+gracefulRampDown: '2m'. Each iteration: GET /api/quotes and GET /api/names. check() both for status 200. Add thresholds: p(95) http_req_duration < 1500ms, p(99) < 3000ms, http_req_failed rate < 10%. Add a custom Rate metric named 'acceptable_latency' that tracks whether each request was under 500ms. Include sleep(1). Save to k6/scripts/quickpizza-stress-test.js.
 EOF
     ;;
     *) echo "" ;;
@@ -595,7 +733,7 @@ main() {
   check_deps
   mkdir -p "$RESULTS_DIR" "$SCRIPTS_DIR"
 
-  local scenarios="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20"
+  local scenarios="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30"
   [[ -n "$FILTER_SCENARIO" ]] && scenarios="$FILTER_SCENARIO"
   local skills="k6-create-mcp k6-create-xk6docs"
   [[ -n "$FILTER_SKILL" ]] && skills="$FILTER_SKILL"

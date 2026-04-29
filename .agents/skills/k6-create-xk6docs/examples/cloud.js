@@ -2,7 +2,7 @@
 /**
  * k6 cloud execution example
  *
- * Covers: ext.loadimpact options (cloud run), multi-region distribution,
+ * Covers: cloud options (cloud run), multi-region distribution,
  *         k6 cloud run and k6 cloud run --local-execution
  *
  * Run commands:
@@ -23,16 +23,14 @@ const BASE_URL = 'https://quickpizza.grafana.com';
 
 export const options = {
   // ── Cloud-specific configuration ────────────────────────────────────────
-  ext: {
-    loadimpact: {
-      projectID: 1234567,                    // replace with your project ID
-      name: 'QuickPizza Cloud Load Test',
+  cloud: {
+    projectID: 1234567,                    // replace with your project ID
+    name: 'QuickPizza Cloud Load Test',
 
-      // Optional: multi-region distribution (percentages must sum to 100)
-      distribution: {
-        'amazon:us:ashburn': { loadZone: 'amazon:us:ashburn', percent: 60 },
-        'amazon:eu:dublin':  { loadZone: 'amazon:eu:dublin',  percent: 40 },
-      },
+    // Optional: multi-region distribution (percentages must sum to 100)
+    distribution: {
+      'amazon:us:ashburn': { loadZone: 'amazon:us:ashburn', percent: 60 },
+      'amazon:eu:dublin':  { loadZone: 'amazon:eu:dublin',  percent: 40 },
     },
   },
 
