@@ -147,6 +147,6 @@ Results are written to `results/comparison-<timestamp>.md`.
 | Executors | constant-vus, ramping-vus, constant-arrival-rate, ramping-arrival-rate, per-vu-iterations, shared-iterations, externally-controlled |
 | Built-in modules | k6/metrics, k6/data, k6/execution, k6/crypto, k6/encoding, k6/html, k6/timers |
 | Lifecycle | setup, teardown, handleSummary, SharedArray |
-| Cloud | `k6 cloud run`, `--local-execution`, `ext.loadimpact` multi-region |
+| Cloud | `k6 cloud run`, `--local-execution`, `cloud` options, multi-region |
 | xk6 extensions | faker, redis, sql/sqlite3, exec, dns, tls, tcp, crawler |
 | Browser best practices | All 9 recommended-practices topics auto-reviewed via `k6 x docs` |

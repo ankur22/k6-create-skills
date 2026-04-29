@@ -30,7 +30,7 @@ def score(path):
     is_browser    = bool(re.search(r"from ['\"]k6/browser['\"]", code))
     is_grpc       = bool(re.search(r"from ['\"]k6/net/grpc['\"]", code))
     is_functional = bool(re.search(r"jslib\.k6\.io/k6-testing", code))
-    is_cloud      = bool(re.search(r"ext\.loadimpact", code))
+    is_cloud      = bool(re.search(r"(?:ext\.loadimpact|^\s*cloud\s*:\s*\{)", code, re.MULTILINE))
     is_extension  = bool(re.search(r"from ['\"]k6/x/", code)) and \
                     not bool(re.search(r"from ['\"]k6/http['\"]|from ['\"]k6/net/grpc['\"]|from ['\"]k6/experimental/websockets['\"]", code))
     is_long_exec  = bool(re.search(r"ramping-vus|ramping-arrival-rate|constant-arrival-rate", code))
