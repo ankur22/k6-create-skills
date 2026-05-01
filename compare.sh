@@ -693,6 +693,9 @@ run_skill_worker() {
   local model_label="${model:-default}"
   echo ">>> scenario=$scenario_num skill=$skill model=$model_label binary=$(basename "$k6_bin")" >&2
 
+  # Save prompt for downstream tools (e.g. llm-judge)
+  echo "$prompt" > "$run_dir/prompt.txt"
+
   local start end duration
   start=$(date +%s)
 
