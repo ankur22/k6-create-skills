@@ -4,11 +4,15 @@
 # Usage:
 #   ./judge-run.sh <scripts-dir>                           Judge all results in the directory
 #   ./judge-run.sh <scripts-dir> --judge-model <model>     Use a specific model for judging
+#   ./judge-run.sh <scripts-dir> --gold-dir <dir>          Gold standard scripts (default: gold/)
 #   ./judge-run.sh <scripts-dir> --parallel N              Run N judges in parallel (default: 2)
 #   ./judge-run.sh --help                                  Show this help
 #
 # The <scripts-dir> should be a results/scripts-<timestamp> directory from compare.sh.
 # Each subdirectory (s1-skill-model/) must contain prompt.txt and a .js script.
+#
+# If --gold-dir is provided (or gold/ exists), scenarios with a matching gold/s<N>.js
+# file will be scored against the reference implementation for stricter evaluation.
 #
 # Output: results/judge-<timestamp>.md with per-script scores and a summary table.
 
@@ -18,6 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
 JUDGE_MODEL=""
+GOLD_DIR=""
 PARALLEL=2
 SCRIPTS_DIR=""
 
@@ -32,6 +37,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --help|-h)        usage ;;
     --judge-model)    JUDGE_MODEL="$2"; shift 2 ;;
+    --gold-dir)       GOLD_DIR="$2";    shift 2 ;;
     --parallel)       PARALLEL="$2";    shift 2 ;;
     *)
       if [[ -z "$SCRIPTS_DIR" ]]; then
@@ -45,7 +51,7 @@ done
 
 if [[ -z "$SCRIPTS_DIR" ]]; then
   echo "error: <scripts-dir> is required" >&2
-  echo "usage: $0 <scripts-dir> [--judge-model <model>] [--parallel N]" >&2
+  echo "usage: $0 <scripts-dir> [--judge-model <model>] [--gold-dir <dir>] [--parallel N]" >&2
   exit 1
 fi
 
@@ -54,14 +60,21 @@ if [[ ! -d "$SCRIPTS_DIR" ]]; then
   exit 1
 fi
 
+# Auto-discover gold dir if not specified
+if [[ -z "$GOLD_DIR" && -d "$SCRIPT_DIR/gold" ]]; then
+  GOLD_DIR="$SCRIPT_DIR/gold"
+fi
+
 # ── Output setup ──────────────────────────────────────────────────────────────
 
 RESULTS_DIR="$SCRIPT_DIR/results"
 mkdir -p "$RESULTS_DIR"
 OUTPUT_FILE="$RESULTS_DIR/judge-$TIMESTAMP.md"
 JUDGE_LABEL="${JUDGE_MODEL:-default}"
+GOLD_LABEL="${GOLD_DIR:-none}"
 
 echo "Judge model: $JUDGE_LABEL" >&2
+echo "Gold dir:    $GOLD_LABEL" >&2
 echo "Scripts dir: $SCRIPTS_DIR" >&2
 echo "Parallelism: $PARALLEL" >&2
 echo "" >&2
@@ -113,6 +126,7 @@ judge_one() {
 
   local judge_args=("$dir")
   [[ -n "$JUDGE_MODEL" ]] && judge_args+=(--judge-model "$JUDGE_MODEL")
+  [[ -n "$GOLD_DIR" ]] && judge_args+=(--gold-dir "$GOLD_DIR")
 
   if python3 "$SCRIPT_DIR/llm-judge.py" "${judge_args[@]}" > "$json_file" 2>/dev/null; then
     local total
@@ -162,10 +176,11 @@ echo "" >&2
   echo "# LLM Judge Results — $TIMESTAMP"
   echo ""
   echo "Judge model: \`$JUDGE_LABEL\`"
+  echo "Gold dir: \`$GOLD_LABEL\`"
   echo "Scripts dir: \`$SCRIPTS_DIR\`"
   echo ""
-  echo "| Scenario | Skill | Model | Adherence | Quality | Complexity | Robustness | Completeness | Total | Notes |"
-  echo "|----------|-------|-------|-----------|---------|------------|------------|--------------|-------|-------|"
+  echo "| Scenario | Skill | Model | Gold | Adherence | Quality | Complexity | Robustness | Completeness | Total | Notes |"
+  echo "|----------|-------|-------|------|-----------|---------|------------|------------|--------------|-------|-------|"
 } > "$OUTPUT_FILE"
 
 # Parse dir names like: s10-k6-create-xk6docs-claude-sonnet-4-6
@@ -217,17 +232,18 @@ import json, sys
 try:
     d = json.load(sys.stdin)
     if 'error' in d:
-        print(f\"err|err|err|err|err|err|{d['error']}\")
+        print(f\"err|err|err|err|err|err|err|{d['error']}\")
     else:
-        print(f\"{d.get('adherence','?')}|{d.get('quality','?')}|{d.get('complexity','?')}|{d.get('robustness','?')}|{d.get('completeness','?')}|{d.get('total','?')}|{d.get('notes','')}\")
+        gold = 'yes' if d.get('gold') else 'no'
+        print(f\"{gold}|{d.get('adherence','?')}|{d.get('quality','?')}|{d.get('complexity','?')}|{d.get('robustness','?')}|{d.get('completeness','?')}|{d.get('total','?')}|{d.get('notes','')}\")
 except:
-    print('err|err|err|err|err|err|parse error')
-" < "$json_file" 2>/dev/null || echo "err|err|err|err|err|err|script error")
+    print('err|err|err|err|err|err|err|parse error')
+" < "$json_file" 2>/dev/null || echo "err|err|err|err|err|err|err|script error")
 
-  IFS='|' read -r adherence quality complexity robustness completeness total notes <<< "$local_scores"
+  IFS='|' read -r gold adherence quality complexity robustness completeness total notes <<< "$local_scores"
 
-  printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" \
-    "$scenario" "$skill" "$model" "$adherence" "$quality" "$complexity" "$robustness" "$completeness" "$total" "$notes" >> "$OUTPUT_FILE"
+  printf "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n" \
+    "$scenario" "$skill" "$model" "$gold" "$adherence" "$quality" "$complexity" "$robustness" "$completeness" "$total" "$notes" >> "$OUTPUT_FILE"
 
   # Also save individual judge result alongside the script
   cp "$json_file" "$dir/judge.json" 2>/dev/null || true
