@@ -1,11 +1,22 @@
 #!/usr/bin/env bash
-# compare.sh — Compare k6-create-mcp and k6-create-xk6docs skills on accuracy and token cost.
+# compare.sh — Compare k6 script generation across skills and/or models.
 #
 # Usage:
-#   ./compare.sh                   Run all scenarios against both skills
+#   ./compare.sh                   Run all scenarios against all skills and the default model
 #   ./compare.sh --scenario N      Run only scenario N (1-30)
 #   ./compare.sh --skill NAME      Run only one skill (k6-create-mcp, k6-create-xk6docs, or grafana-k6)
+#   ./compare.sh --model M         Run only one model (provider/model format, e.g. anthropic/claude-sonnet-4-20250514)
 #   ./compare.sh --help            Show this help
+#
+# Examples:
+#   # Compare skills on the same model (default)
+#   ./compare.sh --model anthropic/claude-sonnet-4-20250514
+#
+#   # Compare models on the same skill
+#   ./compare.sh --skill k6-create-xk6docs --model anthropic/claude-sonnet-4-20250514,anthropic/claude-opus-4-20250514
+#
+#   # Single scenario, single skill, compare two models
+#   ./compare.sh --scenario 1 --skill k6-create-xk6docs --model anthropic/claude-sonnet-4-20250514,anthropic/claude-opus-4-20250514
 #
 # Requirements:
 #   - k6 binary on PATH (standard k6 with xk6-docs for S1-S10, S15-S18)
@@ -79,6 +90,7 @@ K6_WITH_DOCS="/tmp/k6-with-docs"
 
 FILTER_SKILL=""
 FILTER_SCENARIO=""
+FILTER_MODEL=""
 QUICKPIZZA_CONTAINER=""
 REDIS_CONTAINER=""
 
@@ -442,6 +454,7 @@ while [[ $# -gt 0 ]]; do
     --help|-h)      usage ;;
     --skill)        FILTER_SKILL="$2";    shift 2 ;;
     --scenario)     FILTER_SCENARIO="$2"; shift 2 ;;
+    --model)        FILTER_MODEL="$2";    shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
@@ -548,6 +561,7 @@ generate_script() {
   local skill="$1"
   local prompt="$2"
   local out_dir="$3"
+  local model="$4"
 
   mkdir -p "$out_dir"
   [[ -d "$PROTO_DIR" ]] && cp -r "$PROTO_DIR" "$out_dir/proto"
@@ -557,7 +571,10 @@ generate_script() {
   # from cache automatically. No manual k6-with-docs binary required.
 
   local full_prompt="Load and follow the $skill skill. Then: $prompt"
-  opencode run --format json --dir "$out_dir" "$full_prompt" 2>/dev/null
+  local model_args=()
+  [[ -n "$model" ]] && model_args=(--model "$model")
+
+  opencode run --format json --dir "$out_dir" "${model_args[@]}" "$full_prompt" 2>/dev/null
 }
 
 # ── Text + token extraction ───────────────────────────────────────────────────
@@ -662,17 +679,25 @@ run_skill_worker() {
   local k6_bin="$3"
   local prompt="$4"
   local result_file="$5"   # where to write the markdown table row
+  local model="$6"         # provider/model string (may be empty for default)
 
-  local run_dir="$SCRIPTS_DIR/s${scenario_num}-${skill}"
+  # Include model short name in directory to avoid collisions across model runs
+  local model_slug=""
+  if [[ -n "$model" ]]; then
+    # Extract short model name: "anthropic/claude-sonnet-4-20250514" -> "claude-sonnet-4-20250514"
+    model_slug=$(echo "$model" | sed 's|.*/||')
+  fi
+  local run_dir="$SCRIPTS_DIR/s${scenario_num}-${skill}${model_slug:+-${model_slug}}"
   mkdir -p "$run_dir"
 
-  echo ">>> scenario=$scenario_num skill=$skill binary=$(basename "$k6_bin")" >&2
+  local model_label="${model:-default}"
+  echo ">>> scenario=$scenario_num skill=$skill model=$model_label binary=$(basename "$k6_bin")" >&2
 
   local start end duration
   start=$(date +%s)
 
   local json_events=""
-  json_events=$(generate_script "$skill" "$prompt" "$run_dir") || true
+  json_events=$(generate_script "$skill" "$prompt" "$run_dir" "$model") || true
 
   end=$(date +%s)
   duration=$((end - start))
@@ -723,8 +748,8 @@ run_skill_worker() {
   echo "    valid=$valid tokens=$tokens bp=$bp_score duration=${duration}s" >&2
 
   # Write result row to temp file (will be merged into output in order)
-  printf "| S%s | %s | %s | %s | %s | %s |\n" \
-    "$scenario_num" "$skill" "$valid" "$bp_score" "$tokens" "$duration" > "$result_file"
+  printf "| S%s | %s | %s | %s | %s | %s | %s |\n" \
+    "$scenario_num" "$skill" "$model_label" "$valid" "$bp_score" "$tokens" "$duration" > "$result_file"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -737,6 +762,13 @@ main() {
   [[ -n "$FILTER_SCENARIO" ]] && scenarios="$FILTER_SCENARIO"
   local skills="k6-create-mcp k6-create-xk6docs"
   [[ -n "$FILTER_SKILL" ]] && skills="$FILTER_SKILL"
+
+  # Models: comma-separated list via --model, or empty string (uses opencode default)
+  local models=""
+  if [[ -n "$FILTER_MODEL" ]]; then
+    # Convert comma-separated to space-separated
+    models="${FILTER_MODEL//,/ }"
+  fi
 
   ensure_all_binaries "$scenarios"
 
@@ -751,8 +783,8 @@ main() {
 
   echo "# k6 Skill Comparison — $TIMESTAMP" > "$OUTPUT_FILE"
   echo "" >> "$OUTPUT_FILE"
-  echo "| Scenario | Skill | Valid | BP Score | Tokens | Duration (s) |" >> "$OUTPUT_FILE"
-  echo "|----------|-------|-------|----------|--------|--------------|" >> "$OUTPUT_FILE"
+  echo "| Scenario | Skill | Model | Valid | BP Score | Tokens | Duration (s) |" >> "$OUTPUT_FILE"
+  echo "|----------|-------|-------|-------|----------|--------|--------------|" >> "$OUTPUT_FILE"
 
   for scenario_num in $scenarios; do
     local prompt
@@ -767,23 +799,28 @@ main() {
     if [[ "$k6_bin" != "$K6_DEFAULT" && ! -f "$k6_bin" ]]; then
       echo ">>> scenario=$scenario_num: SKIP (binary $k6_bin not available)" >&2
       for skill in $skills; do
-        printf "| S%s | %s | %s | %s | %s | %s |\n" \
-          "$scenario_num" "$skill" "skip(no binary)" "n/a" "n/a" "0" >> "$OUTPUT_FILE"
+        for model in ${models:-""}; do
+          local model_label="${model:-default}"
+          printf "| S%s | %s | %s | %s | %s | %s | %s |\n" \
+            "$scenario_num" "$skill" "$model_label" "skip(no binary)" "n/a" "n/a" "0" >> "$OUTPUT_FILE"
+        done
       done
       continue
     fi
 
-    # ── Run both skills in parallel ─────────────────────────────────────────
+    # ── Run all skill×model combinations in parallel ────────────────────────
     local pids=()
     local result_files=()
-    local skill_order=()
 
     for skill in $skills; do
-      local result_file="$SCRIPTS_DIR/s${scenario_num}-${skill}.result"
-      run_skill_worker "$scenario_num" "$skill" "$k6_bin" "$prompt" "$result_file" &
-      pids+=("$!")
-      result_files+=("$result_file")
-      skill_order+=("$skill")
+      for model in ${models:-""}; do
+        local model_slug=""
+        [[ -n "$model" ]] && model_slug=$(echo "$model" | sed 's|.*/||')
+        local result_file="$SCRIPTS_DIR/s${scenario_num}-${skill}${model_slug:+-${model_slug}}.result"
+        run_skill_worker "$scenario_num" "$skill" "$k6_bin" "$prompt" "$result_file" "$model" &
+        pids+=("$!")
+        result_files+=("$result_file")
+      done
     done
 
     # Wait for all workers for this scenario, then collect results in order
@@ -791,7 +828,7 @@ main() {
       wait "${pids[$i]}" || true
     done
 
-    # Append results to output in the original skill order
+    # Append results to output in the original order
     for result_file in "${result_files[@]}"; do
       if [[ -f "$result_file" ]]; then
         cat "$result_file" >> "$OUTPUT_FILE"
