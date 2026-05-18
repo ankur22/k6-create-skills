@@ -1,23 +1,22 @@
 # k6 Docs Lookup Guidance
 
 Use this file when you need to look up k6 documentation with the docs subcommand.
-`DOCS_CMD` was set in Step 0 — substitute it in the commands below.
+`DOCS_CMD` is established in Step 3 of `SKILL.md` — substitute it in the commands below.
+
+> **Important:** `DOCS_CMD` must include the `script` TTY wrapper set up in
+> Step 3. Without it, every invocation returns a generic "browse files" guide
+> instead of actual content. Redirect stderr to suppress AER log lines:
+> `$DOCS_CMD <path> 2>/dev/null`
 
 ---
 
 ## Commands
 
 ```
-$DOCS_CMD                        # overview of all topics
-$DOCS_CMD <path>                 # read a topic; shows content + subtopics at the bottom
-$DOCS_CMD <path> --depth 2      # read a topic + 2 levels of subtopics in one call
-$DOCS_CMD search <term>         # fuzzy search; returns matching paths
-```
-
-If `DOCS_CMD` includes a `--version` flag, append the path after all flags:
-```
-k6 x docs --version v1.6.1 javascript-api/k6-http
-k6 x docs --version v1.6.1 search websocket
+$DOCS_CMD 2>/dev/null                        # overview of all topics
+$DOCS_CMD <path> 2>/dev/null                 # read a topic; shows content + subtopics at the bottom
+$DOCS_CMD <path> --depth 2 2>/dev/null      # read a topic + 2 levels of subtopics in one call
+$DOCS_CMD search <term> 2>/dev/null         # fuzzy search; returns matching paths
 ```
 
 Paths use spaces or slashes interchangeably.
