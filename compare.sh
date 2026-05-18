@@ -574,7 +574,7 @@ generate_script() {
   local model_args=()
   [[ -n "$model" ]] && model_args=(--model "$model")
 
-  opencode run --format json --dir "$out_dir" "${model_args[@]}" "$full_prompt" 2>/dev/null
+  opencode run --format json --dir "$out_dir" ${model_args[@]+"${model_args[@]}"} "$full_prompt" 2>/dev/null
 }
 
 # ── Text + token extraction ───────────────────────────────────────────────────
