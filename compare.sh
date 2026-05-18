@@ -82,11 +82,12 @@ K6_DEFAULT="${K6_BIN:-k6}"
 K6_FAKER="/tmp/k6-faker"
 K6_EXTENSIONS="/tmp/k6-extensions"
 K6_SQL_SQLITE="/tmp/k6-sql-sqlite"
-K6_NET_EXTENSIONS="/tmp/k6-net-extensions"
 
-# k6 binary with xk6-subcommand-docs (for xk6docs skill live doc lookups)
-# Note: the GitHub repo is xk6-docs but the Go module is xk6-subcommand-docs
-K6_WITH_DOCS="/tmp/k6-with-docs"
+# S14 (dns/tls/tcp): xk6-tls hasn't been ported to k6 v2 (still depends on
+# go.k6.io/k6 v1.x).  Use a k6 v1.7.1 release binary — its AER resolves all
+# three extensions (dns, tls, tcp) automatically.
+K6_V1="/tmp/k6-v1"
+K6_V1_VERSION="v1.7.1"
 
 FILTER_SKILL=""
 FILTER_SCENARIO=""
@@ -101,7 +102,7 @@ get_k6_binary() {
     11) echo "$K6_FAKER" ;;
     12) echo "$K6_EXTENSIONS" ;;
     13) echo "$K6_SQL_SQLITE" ;;
-    14) echo "$K6_NET_EXTENSIONS" ;;
+    14) echo "$K6_V1" ;; # k6 v1.x — xk6-tls not yet ported to k6 v2
     20) echo "$K6_EXTENSIONS" ;; # needs xk6-exec for file writes
     *)  echo "$K6_DEFAULT" ;;
   esac
@@ -496,6 +497,39 @@ ensure_binary() {
   fi
 }
 
+# Download a stock k6 v1.x release binary for scenarios that need extensions
+# not yet ported to k6 v2 (e.g. xk6-tls).  AER on k6 v1.x resolves them.
+ensure_k6_v1() {
+  if [[ -f "$K6_V1" ]]; then return 0; fi
+
+  local arch
+  case "$(uname -m)" in
+    arm64|aarch64) arch="arm64" ;;
+    *)             arch="amd64" ;;
+  esac
+  local os
+  case "$(uname -s)" in
+    Darwin) os="macos" ;;
+    *)      os="linux" ;;
+  esac
+
+  local url="https://github.com/grafana/k6/releases/download/${K6_V1_VERSION}/k6-${K6_V1_VERSION}-${os}-${arch}.zip"
+  local zip="/tmp/k6-v1-download.zip"
+
+  echo "Downloading k6 ${K6_V1_VERSION} (${os}/${arch}) for S14..." >&2
+  if curl -fsSL -o "$zip" "$url"; then
+    local tmpdir; tmpdir=$(mktemp -d)
+    unzip -qo "$zip" -d "$tmpdir"
+    cp "$tmpdir"/k6-*/k6 "$K6_V1"
+    chmod +x "$K6_V1"
+    rm -rf "$tmpdir" "$zip"
+    echo "Downloaded: $K6_V1 ($($K6_V1 version 2>&1 | head -1))" >&2
+  else
+    echo "warning: failed to download k6 ${K6_V1_VERSION}" >&2
+    return 1
+  fi
+}
+
 ensure_all_binaries() {
   local scenarios="$1"
   for s in $scenarios; do
@@ -508,19 +542,13 @@ ensure_all_binaries() {
       13) CGO_ENABLED=1 ensure_binary "$K6_SQL_SQLITE" "k6-sql-sqlite" \
             --with github.com/grafana/xk6-sql@latest \
             --with github.com/grafana/xk6-sql-driver-sqlite3@latest || true ;;
-      14) ensure_binary "$K6_NET_EXTENSIONS" "k6-net-extensions" \
-            --with github.com/grafana/xk6-dns@latest \
-            --with github.com/grafana/xk6-tls@latest \
-            --with github.com/grafana/xk6-tcp@latest \
-            --with github.com/grafana/xk6-crawler@latest ;;
+      14) ensure_k6_v1 ;;
     esac
   done
 
-  # Always build k6-with-docs for the xk6docs skill to use live doc lookups.
-  # The GitHub repo is xk6-docs but the Go module path is xk6-subcommand-docs.
-  ensure_binary "$K6_WITH_DOCS" "k6-with-docs(xk6-subcommand-docs)" \
-    --with github.com/grafana/xk6-subcommand-docs@latest || \
-    echo "warning: k6-with-docs not built — xk6docs skill will use examples-only mode" >&2
+  # k6 v1.7.0+ auto-provisions the docs subcommand via AER.  The xk6docs
+  # skill now uses a TTY wrapper (`script -q /dev/null k6 x docs`) so
+  # building a separate k6-with-docs binary is no longer needed.
 }
 
 # ── Docker management ─────────────────────────────────────────────────────────
@@ -574,7 +602,7 @@ generate_script() {
   local model_args=()
   [[ -n "$model" ]] && model_args=(--model "$model")
 
-  opencode run --format json --dir "$out_dir" "${model_args[@]}" "$full_prompt" 2>/dev/null
+  opencode run --format json --dir "$out_dir" ${model_args[@]+"${model_args[@]}"} "$full_prompt" 2>/dev/null
 }
 
 # ── Text + token extraction ───────────────────────────────────────────────────

@@ -16,8 +16,8 @@ $DOCS_CMD using-k6-browser/recommended-practices/hybrid-approach-to-performance
 $DOCS_CMD using-k6-browser/recommended-practices/page-object-model-pattern
 $DOCS_CMD using-k6-browser/recommended-practices/simulate-user-input-delay
 
-# With web fallback:
-WebFetch https://grafana.com/docs/k6/latest/using-k6-browser/recommended-practices/<topic>/
+# Web fallback — fetch with whatever capability your agent has (built-in fetch, or curl):
+# https://grafana.com/docs/k6/latest/using-k6-browser/recommended-practices/<topic>/
 ```
 
 ---

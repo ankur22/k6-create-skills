@@ -1,6 +1,6 @@
 # k6-create-xk6docs: Setup Guide
 
-`k6 x docs` is not working in the current environment.
+Read this file when `k6 x docs` is not working — it covers how to provision (or build) the docs binary, and how to message the user if neither path succeeds.
 
 ## k6 v1.7.0+ (recommended) — no build required
 
