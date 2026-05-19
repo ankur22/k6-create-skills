@@ -108,11 +108,13 @@ judge_one() {
     return
   fi
 
-  # Check for a script file
+  # Check for a script file (k6/scripts/*.js, generated.js, or any .js in tree)
   local has_script=false
   if compgen -G "$dir/k6/scripts/*.js" >/dev/null 2>&1; then
     has_script=true
   elif [[ -f "$dir/generated.js" ]]; then
+    has_script=true
+  elif find "$dir" -name "*.js" -print -quit 2>/dev/null | grep -q .; then
     has_script=true
   fi
 

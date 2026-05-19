@@ -23,6 +23,7 @@ Read only the file that matches the user's request. Examples provide structural 
 | WebSocket | `examples/websocket.js` |
 | gRPC | `examples/grpc.js` |
 | Browser automation | `examples/browser.js` |
+| Browser + functional test / `expect()` / k6-testing | `examples/functional.js` (browser scenario) |
 | Functional/integration tests, `expect()`, k6-testing | `examples/functional.js` |
 | Custom metrics, execution module, handleSummary, per-vu-iterations | `examples/metrics.js` |
 | Load patterns, all executors (ramping, arrival rate, per-VU, etc.) | `examples/executors.js` |
@@ -38,6 +39,8 @@ Read only the file that matches the user's request. Examples provide structural 
 | xk6-crawler | `examples/ext-crawler.js` |
 
 Example files live in the `examples/` directory alongside this `SKILL.md`.
+
+**When the request matches multiple rows** (e.g. "browser" + "functional test"), prefer the row whose assertion style fits the intent. If the user says "functional test", "assert", "verify", or "expect", use `functional.js` even if the test involves a browser — it demonstrates `expect()` with auto-retrying browser matchers. Use `browser.js` for browser load/performance tests that don't emphasize correctness assertions.
 
 ---
 
@@ -137,7 +140,7 @@ Review the script against the rules below. The checklist is authoritative — on
 - **`export const options` with realistic VUs/duration.** Default VUs/durations make the test meaningful out of the box.
 - **Define `thresholds` for every load test.** Without thresholds the run can't fail in CI even when performance regresses, which defeats the point of running a load test. At minimum include `http_req_duration` and `http_req_failed` (or the protocol equivalent). Pure functional tests — single-iteration `expect()`-only scripts — can skip this.
 - **Include `sleep()` in every load test.** `sleep()` represents user think time; without it, VUs hammer endpoints faster than any real user would, inflating throughput and crowding out the system under test. This applies to HTTP, WebSocket, gRPC, crypto, extension scripts, and all executor types. Browser scripts use `page.waitForTimeout()` instead, and single-iteration functional tests can skip it.
-- **Assert every response** with `check()` or `expect()` — silent failures are worse than loud ones.
+- **Assert every response.** **Browser scripts**: use `expect()` from k6-testing — it auto-retries against locators and replaces `waitFor()` + `isVisible()` + `check()` chains. If you need metric-tracked `check()` inside an async browser function, import from `https://jslib.k6.io/k6-utils/1.5.0/index.js` — the standard `check` from `k6` does NOT work in async contexts. **HTTP/gRPC/WS scripts**: use `check()` for metric-tracked assertions, or `expect()` for functional tests. Silent failures are worse than loud ones.
 - **Browser scripts:** wrap interactions in `try/finally` with `page.close()` in `finally`, so pages clean up even when assertions throw.
 - **gRPC scripts:** call `client.close()` after each iteration to release the connection.
 - **No `let`/`var` at top level** — use `const`, since module-scope state is shared across VUs and mutability there is almost always a bug.

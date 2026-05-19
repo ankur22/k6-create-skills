@@ -3,9 +3,10 @@
 #
 # Usage:
 #   ./compare.sh                   Run all scenarios against all skills and the default model
-#   ./compare.sh --scenario N      Run only scenario N (1-30)
+#   ./compare.sh --scenario N      Run only scenario N (1-19, 21-30)
 #   ./compare.sh --skill NAME      Run only one skill (k6-create-mcp, k6-create-xk6docs, or grafana-k6)
 #   ./compare.sh --model M         Run only one model (provider/model format, e.g. anthropic/claude-sonnet-4-20250514)
+#   ./compare.sh --parallel N      Run at most N skill workers in parallel (default: 2)
 #   ./compare.sh --help            Show this help
 #
 # Examples:
@@ -52,7 +53,6 @@
 #   S17: k6 cloud run script (generate only, cloud options)
 #   S18: k6 cloud run --local-execution (hybrid, generate only)
 #   S19: Browser login flow (functional test with screenshots)
-#   S20: Binary file download (save to disk via xk6-exec)
 #   S21: Smoke test (1 VU, 1 iteration, minimal)
 #   S22: Environment variable parameterization
 #   S23: CSV data-driven test (SharedArray, inline CSV)
@@ -92,6 +92,7 @@ K6_V1_VERSION="v1.7.1"
 FILTER_SKILL=""
 FILTER_SCENARIO=""
 FILTER_MODEL=""
+PARALLEL=2
 QUICKPIZZA_CONTAINER=""
 REDIS_CONTAINER=""
 
@@ -103,7 +104,6 @@ get_k6_binary() {
     12) echo "$K6_EXTENSIONS" ;;
     13) echo "$K6_SQL_SQLITE" ;;
     14) echo "$K6_V1" ;; # k6 v1.x — xk6-tls not yet ported to k6 v2
-    20) echo "$K6_EXTENSIONS" ;; # needs xk6-exec for file writes
     *)  echo "$K6_DEFAULT" ;;
   esac
 }
@@ -309,10 +309,6 @@ EOF
 I want you to test https://quickpizza.grafana.com/. Click login. Login with the credentials that are in the page (default/12345678). Click on back to main page. Click on pizza please. Click love it. I want this to be a functional test, so make sure after clicking on love it you see "Rated!". Also ensure that there are screenshots in place after each call API call to capture what has happened.
 EOF
     ;;
-    20) cat <<'EOF'
-We need to create an HTTP K6 test script. It should be one VU, one iteration. Its main job will be to download a binary (from https://github.com/grafana/k6/releases/download/v1.6.1/k6-v1.6.1-linux-amd64.deb) and save it to the local disk.
-EOF
-    ;;
     21) cat <<'EOF'
 Create a minimal k6 smoke test for https://quickpizza.grafana.com/api/quotes. Use 1 VU, 1 iteration (via options, not CLI flags). GET the endpoint, check status 200 and that the response body is valid JSON. Add a threshold: p(95) http_req_duration under 1000ms. No sleep needed — this is a single-iteration smoke test. Save to k6/scripts/quickpizza-smoke.js.
 EOF
@@ -456,6 +452,7 @@ while [[ $# -gt 0 ]]; do
     --skill)        FILTER_SKILL="$2";    shift 2 ;;
     --scenario)     FILTER_SCENARIO="$2"; shift 2 ;;
     --model)        FILTER_MODEL="$2";    shift 2 ;;
+    --parallel)     PARALLEL="$2";        shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
@@ -683,15 +680,29 @@ validate_script_file() {
 
   # Run with the specified binary first; if it fails due to missing extension
   # dependency (k6/x/*), retry with the full extensions binary.
-  if $cmd >/dev/null 2>&1; then
+  # Exit code 99 = thresholds breached (script is valid, runtime performance issue).
+  local exit_code
+  $cmd >/dev/null 2>&1 && exit_code=0 || exit_code=$?
+
+  if [[ "$exit_code" -eq 0 ]]; then
     echo "pass"
+  elif [[ "$exit_code" -eq 99 ]]; then
+    echo "pass(threshold-breach)"
   else
     # Check if the failure is an extension dependency issue
     local err_out
     err_out=$($cmd 2>&1 || true)
     if echo "$err_out" | grep -q "k6/x/" && [[ "$k6_bin" != "$K6_EXTENSIONS" && -f "$K6_EXTENSIONS" ]]; then
       local ext_cmd="${cmd/$k6_bin/$K6_EXTENSIONS}"
-      $ext_cmd >/dev/null 2>&1 && echo "pass(ext-bin)" || echo "fail"
+      local ext_exit
+      $ext_cmd >/dev/null 2>&1 && ext_exit=0 || ext_exit=$?
+      if [[ "$ext_exit" -eq 0 ]]; then
+        echo "pass(ext-bin)"
+      elif [[ "$ext_exit" -eq 99 ]]; then
+        echo "pass(ext-bin,threshold-breach)"
+      else
+        echo "fail"
+      fi
     else
       echo "fail"
     fi
@@ -789,9 +800,9 @@ main() {
   check_deps
   mkdir -p "$RESULTS_DIR" "$SCRIPTS_DIR"
 
-  local scenarios="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30"
+  local scenarios="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 21 22 23 24 25 26 27 28 29 30"
   [[ -n "$FILTER_SCENARIO" ]] && scenarios="$FILTER_SCENARIO"
-  local skills="k6-create-mcp k6-create-xk6docs"
+  local skills="k6-create-mcp k6-create-xk6docs grafana-k6"
   [[ -n "$FILTER_SKILL" ]] && skills="$FILTER_SKILL"
 
   # Models: comma-separated list via --model, or empty string (uses opencode default)
@@ -839,9 +850,10 @@ main() {
       continue
     fi
 
-    # ── Run all skill×model combinations in parallel ────────────────────────
+    # ── Run skill×model combinations with throttled parallelism ──────────────
     local pids=()
     local result_files=()
+    local active=0
 
     for skill in $skills; do
       for model in ${models:-""}; do
@@ -851,12 +863,20 @@ main() {
         run_skill_worker "$scenario_num" "$skill" "$k6_bin" "$prompt" "$result_file" "$model" &
         pids+=("$!")
         result_files+=("$result_file")
+        active=$((active + 1))
+
+        # Throttle: wait for the oldest worker before launching more
+        if [[ $active -ge $PARALLEL ]]; then
+          wait "${pids[0]}" || true
+          pids=("${pids[@]:1}")
+          active=$((active - 1))
+        fi
       done
     done
 
-    # Wait for all workers for this scenario, then collect results in order
-    for i in "${!pids[@]}"; do
-      wait "${pids[$i]}" || true
+    # Wait for remaining workers
+    for pid in "${pids[@]}"; do
+      wait "$pid" || true
     done
 
     # Append results to output in the original order

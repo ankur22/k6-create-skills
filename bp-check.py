@@ -29,6 +29,7 @@ def score(path):
 
     is_browser    = bool(re.search(r"from ['\"]k6/browser['\"]", code))
     is_grpc       = bool(re.search(r"from ['\"]k6/net/grpc['\"]", code))
+    is_websocket  = bool(re.search(r"from ['\"]k6/experimental/websockets['\"]", code))
     is_functional = bool(re.search(r"jslib\.k6\.io/k6-testing", code))
     is_cloud      = bool(re.search(r"(?:ext\.loadimpact|^\s*cloud\s*:\s*\{)", code, re.MULTILINE))
     is_extension  = bool(re.search(r"from ['\"]k6/x/", code)) and \
@@ -50,8 +51,8 @@ def score(path):
     rules.append(("R3 assertions (check/expect)", bool(re.search(r"\bcheck\s*\(|\bexpect\s*\(", code))))
 
     # R4 sleep
-    if is_browser or is_functional or is_extension:
-        rules.append(("R4 sleep (n/a browser/functional/extension)", True))
+    if is_browser or is_functional or is_extension or is_websocket:
+        rules.append(("R4 sleep (n/a browser/functional/extension/ws)", True))
     else:
         rules.append(("R4 sleep() for think time", bool(re.search(r"\bsleep\s*\(", code))))
 
