@@ -64,6 +64,42 @@ await page.waitForLoadState('networkidle');
 await page.getByLabel('Username').fill('user');
 ```
 
+## Assertions — use `expect()` from k6-testing, not `check()`
+
+k6-testing `expect()` provides auto-retrying matchers purpose-built for browser locators. They replace the verbose `waitFor()` → `isVisible()` → `check()` anti-pattern:
+
+```javascript
+import { expect } from 'https://jslib.k6.io/k6-testing/0.6.1/index.js';
+
+// ✅ correct — one line, auto-retries until visible or timeout
+await expect(page.getByText('Rated!')).toBeVisible();
+await expect(page.locator('#result')).toContainText('Success');
+await expect(page).toHaveTitle(/Dashboard/);
+
+// ❌ wrong — verbose, redundant (if waitFor succeeds, isVisible is always true)
+const el = page.getByText('Rated!');
+await el.waitFor({ state: 'visible', timeout: 5000 });
+check(await el.isVisible(), { 'visible': (v) => v === true });
+```
+
+Available retrying matchers:
+- `toBeVisible()`, `toBeHidden()`, `toBeEnabled()`, `toBeChecked()`
+- `toHaveText(text)`, `toContainText(text)`
+- `toHaveAttribute(name, value)`, `toHaveValue(value)`
+- `toHaveTitle(titleOrRegex)` (on page objects)
+
+Use `expect()` for browser correctness assertions. If you need metric-tracked `check()` in an async browser context (e.g. hybrid protocol + browser scripts), import the async-compatible version from k6-utils — the standard `check` from `k6` does not work in async functions:
+
+```javascript
+// ✅ async-compatible check — works inside async browser functions
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
+
+// ❌ standard check — does NOT work in async contexts
+// import { check } from 'k6';
+```
+
+Prefer `expect()` for assertions. Use async `check()` from k6-utils only when you specifically need k6 metric tracking (e.g. `checks` rate threshold) on a value obtained inside an async browser function.
+
 ## Other rules
 
 - **User delays**: use `page.waitForTimeout()` not `sleep()` in browser scripts
