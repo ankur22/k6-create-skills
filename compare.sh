@@ -752,9 +752,9 @@ run_skill_worker() {
   tokens="${tokens:-n/a}"
   echo "$assistant_text" > "$run_dir/response.md"
 
-  # Extract script from response
+  # Extract script from response (tolerate broken-pipe on large outputs)
   local script_content
-  script_content=$(extract_script "$assistant_text")
+  script_content=$(extract_script "$assistant_text") || true
   local generated_js="$run_dir/generated.js"
   [[ -n "$script_content" ]] && echo "$script_content" > "$generated_js"
 
