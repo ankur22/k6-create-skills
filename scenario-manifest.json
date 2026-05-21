@@ -1,0 +1,91 @@
+{
+  "scenarios": {
+    "1": {
+      "name": "HTTP REST basic load",
+      "checks": [
+        { "id": "S1.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-basic-load.js", "description": "saved to requested file path" },
+        { "id": "S1.import_http", "type": "import", "module": "k6/http", "description": "imports k6/http" },
+        { "id": "S1.import_k6", "type": "import", "module": "k6", "description": "imports k6 helpers" },
+        { "id": "S1.vus", "type": "option_number", "key": "vus", "value": 5, "description": "uses 5 VUs" },
+        { "id": "S1.duration", "type": "option_duration", "key": "duration", "value": "30s", "description": "runs for 30 seconds" },
+        { "id": "S1.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S1.names_get", "type": "http_request", "method": "get", "path": "/api/names", "description": "GETs /api/names" },
+        { "id": "S1.quotes_body", "type": "contains", "value": "quotes", "description": "checks response body contains quotes" },
+        { "id": "S1.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<500", "description": "sets p95 duration threshold under 500ms" },
+        { "id": "S1.failed_threshold", "type": "threshold", "metric": "http_req_failed", "expression": "rate<0.01", "description": "sets failure-rate threshold under 1%" },
+        { "id": "S1.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
+      ]
+    },
+    "4": {
+      "name": "WebSocket QuickPizza",
+      "checks": [
+        { "id": "S4.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-websocket.js", "description": "saved to requested file path" },
+        { "id": "S4.experimental_ws", "type": "import", "module": "k6/experimental/websockets", "description": "uses experimental WebSocket API" },
+        { "id": "S4.no_legacy_ws", "type": "no_import", "module": "k6/ws", "description": "does not import deprecated k6/ws" },
+        { "id": "S4.ws_url", "type": "contains", "value": "wss://quickpizza.grafana.com/ws", "description": "connects to QuickPizza WebSocket URL" },
+        { "id": "S4.open_event", "type": "regex", "pattern": "(?:addEventListener|on)\\s*\\(\\s*['\"]open['\"]", "description": "handles open event" },
+        { "id": "S4.message_event", "type": "regex", "pattern": "(?:addEventListener|on)\\s*\\(\\s*['\"]message['\"]", "description": "handles message event" },
+        { "id": "S4.error_event", "type": "regex", "pattern": "(?:addEventListener|on)\\s*\\(\\s*['\"]error['\"]", "description": "handles error event" },
+        { "id": "S4.payload_visitor", "type": "contains", "value": "ws_visitor_id", "description": "sends ws_visitor_id" },
+        { "id": "S4.payload_order", "type": "contains", "value": "order_pizza", "description": "sends order_pizza message" },
+        { "id": "S4.error_property", "type": "not_regex", "pattern": "\\b(?:e|event|err)\\.error\\s*\\(", "description": "uses e.error property, not e.error()" },
+        { "id": "S4.shared_iterations", "type": "contains", "value": "shared-iterations", "description": "uses shared-iterations scenario" },
+        { "id": "S4.vus", "type": "option_number", "key": "vus", "value": 5, "description": "uses 5 VUs" },
+        { "id": "S4.iterations", "type": "option_number", "key": "iterations", "value": 10, "description": "uses 10 iterations" },
+        { "id": "S4.sync_default", "type": "sync_default_function", "description": "default function is synchronous" }
+      ]
+    },
+    "5": {
+      "name": "gRPC local QuickPizza",
+      "checks": [
+        { "id": "S5.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-grpc.js", "description": "saved to requested file path" },
+        { "id": "S5.grpc_import", "type": "import", "module": "k6/net/grpc", "description": "imports k6/net/grpc" },
+        { "id": "S5.proto_path", "type": "regex", "pattern": "client\\.load\\s*\\(\\s*\\[\\s*['\"][^'\"]*proto[^'\"]*['\"]\\s*\\]\\s*,\\s*['\"]quickpizza\\.proto['\"]", "description": "loads quickpizza.proto from a proto directory" },
+        { "id": "S5.connect_addr", "type": "contains", "value": "localhost:3334", "description": "references localhost:3334" },
+        { "id": "S5.connect_plaintext", "type": "regex", "pattern": "\\bconnect\\s*\\([\\s\\S]*?plaintext\\s*:\\s*true", "description": "uses plaintext: true in connect()" },
+        { "id": "S5.status_invoke", "type": "grpc_invoke", "method": "quickpizza.GRPC/Status", "description": "invokes Status" },
+        { "id": "S5.rate_invoke", "type": "grpc_invoke", "method": "quickpizza.GRPC/RatePizza", "description": "invokes RatePizza" },
+        { "id": "S5.status_ok", "type": "contains", "value": "StatusOK", "description": "checks StatusOK" },
+        { "id": "S5.ready", "type": "contains", "value": "ready", "description": "checks ready field" },
+        { "id": "S5.stars", "type": "contains", "value": "starsRating", "description": "checks starsRating range" },
+        { "id": "S5.threshold", "type": "threshold", "metric": "grpc_req_duration", "expression": "p(95)<500", "description": "sets gRPC p95 threshold under 500ms" },
+        { "id": "S5.vus", "type": "option_number", "key": "vus", "value": 3, "description": "uses 3 VUs" },
+        { "id": "S5.duration", "type": "option_duration", "key": "duration", "value": "20s", "description": "runs for 20 seconds" }
+      ]
+    },
+    "19": {
+      "name": "Browser login and rating functional flow",
+      "checks": [
+        { "id": "S19.browser_import", "type": "import", "module": "k6/browser", "description": "imports k6/browser" },
+        { "id": "S19.shared_iterations", "type": "contains", "value": "shared-iterations", "description": "uses shared-iterations scenario" },
+        { "id": "S19.login", "type": "regex", "pattern": "[Ll]ogin", "description": "interacts with login page" },
+        { "id": "S19.username", "type": "contains", "value": "default", "description": "uses default username" },
+        { "id": "S19.password", "type": "contains", "value": "12345678", "description": "uses default password" },
+        { "id": "S19.back", "type": "regex", "pattern": "Back to main page|href=['\"]/['\"]", "description": "navigates back to main page" },
+        { "id": "S19.pizza", "type": "contains", "value": "Pizza, Please!", "description": "clicks Pizza, Please!" },
+        { "id": "S19.love", "type": "contains", "value": "Love it!", "description": "clicks Love it!" },
+        { "id": "S19.rated", "type": "contains", "value": "Rated!", "description": "asserts Rated!" },
+        { "id": "S19.expect_import", "category": "style", "type": "import", "module": "https://jslib.k6.io/k6-testing/0.6.1/index.js", "description": "imports k6-testing expect (preferred for functional tests)" },
+        { "id": "S19.expect_rated", "category": "style", "type": "browser_expect", "text": "Rated!", "description": "uses expect() for Rated! (preferred over check)" },
+        { "id": "S19.screenshots", "category": "artifacts", "type": "screenshot_count", "min": 6, "description": "captures at least 6 screenshots across the flow" }
+      ]
+    },
+    "27": {
+      "name": "Multipart file upload",
+      "checks": [
+        { "id": "S27.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-file-upload.js", "description": "saved to requested file path" },
+        { "id": "S27.http_import", "type": "import", "module": "k6/http", "description": "imports k6/http" },
+        { "id": "S27.file_api", "type": "regex", "pattern": "http\\.file\\s*\\(", "description": "uses http.file()" },
+        { "id": "S27.filename", "type": "contains", "value": "ratings.csv", "description": "uploads ratings.csv" },
+        { "id": "S27.mime", "type": "contains", "value": "text/csv", "description": "uses text/csv MIME type" },
+        { "id": "S27.endpoint", "type": "http_request", "method": "post", "path": "/api/ratings", "description": "POSTs to /api/ratings" },
+        { "id": "S27.description", "type": "contains", "value": "Pizza ratings upload", "description": "includes description field" },
+        { "id": "S27.status_codes", "type": "regex", "pattern": "200[\\s\\S]*201[\\s\\S]*400[\\s\\S]*404|\\[\\s*200\\s*,\\s*201\\s*,\\s*400\\s*,\\s*404\\s*\\]", "description": "accepts expected upload status codes" },
+        { "id": "S27.threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<2000", "description": "sets p95 threshold under 2000ms" },
+        { "id": "S27.vus", "type": "option_number", "key": "vus", "value": 2, "description": "uses 2 VUs" },
+        { "id": "S27.duration", "type": "option_duration", "key": "duration", "value": "20s", "description": "runs for 20 seconds" },
+        { "id": "S27.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
+      ]
+    }
+  }
+}

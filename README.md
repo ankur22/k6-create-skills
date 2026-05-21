@@ -75,7 +75,19 @@ Quality is a three-way tie (24.0–24.2/25). The raw MCP server is self-sufficie
 
 ### Best-practices checker (`bp-check.py`)
 
-Each generated script is scored against 10 rules:
+Each generated script is scored against categorized static checks. The JSON output keeps
+`score`, `max`, and `issues` for the comparison table, and adds per-category detail for
+judge input and debugging:
+
+| Category | Purpose |
+|----------|---------|
+| `validity` | Script file exists |
+| `best_practices` | General k6 script hygiene |
+| `protocol_specific` | Browser, WebSocket, and gRPC-specific rules |
+| `prompt_adherence` | Scenario-manifest checks for representative scenarios |
+| `artifacts` | Required file paths and generated artifacts such as screenshots |
+
+General best-practice coverage includes:
 
 | Rule | Check |
 |------|-------|
@@ -89,6 +101,14 @@ Each generated script is scored against 10 rules:
 | R8 | gRPC: `client.close()` called |
 | R9 | No mutable top-level `let`/`var` |
 | R10 | Exported test function(s) present |
+
+Representative scenarios are also checked against `scenario-manifest.json` for exact
+requirements. The current manifest covers S1, S4, S5, S19, and S27.
+
+The LLM judge reads `validation.txt` and `bp.json` from each run directory and applies
+hard caps for deterministic failures, such as missing scripts, failed validation,
+missing requested artifacts, missing assertions, missing thresholds, or cleanup that is
+not guaranteed by `finally`.
 
 ## Running the comparison
 

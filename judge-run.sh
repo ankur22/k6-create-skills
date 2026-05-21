@@ -103,9 +103,7 @@ judge_one() {
   dir_name=$(basename "$dir")
 
   if [[ ! -f "$dir/prompt.txt" ]]; then
-    echo "  SKIP $dir_name (no prompt.txt)" >&2
-    echo '{"error": "no prompt.txt"}' > "$json_file"
-    return
+    echo "  WARN $dir_name (no prompt.txt; scoring as visible failure)" >&2
   fi
 
   # Check for a script file (k6/scripts/*.js, generated.js, or any .js in tree)
@@ -119,9 +117,7 @@ judge_one() {
   fi
 
   if ! $has_script; then
-    echo "  SKIP $dir_name (no script)" >&2
-    echo '{"error": "no script file"}' > "$json_file"
-    return
+    echo "  WARN $dir_name (no script; scoring as visible failure)" >&2
   fi
 
   echo "  JUDGE $dir_name ..." >&2
@@ -272,7 +268,7 @@ for f in sorted(os.listdir(tmp_dir)):
     try:
         with open(os.path.join(tmp_dir, f)) as fh:
             d = json.load(fh)
-        if "error" in d:
+        if "error" in d and not isinstance(d.get("total"), (int, float)):
             continue
         # Parse group from filename
         name = f.replace(".json", "")
