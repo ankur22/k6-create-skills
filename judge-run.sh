@@ -200,9 +200,9 @@ parse_dir_name() {
   if [[ "$rest" == k6-create-xk6docs* ]]; then
     skill="k6-create-xk6docs"
     model="${rest#k6-create-xk6docs}"
-  elif [[ "$rest" == k6-create-mcp* ]]; then
-    skill="k6-create-mcp"
-    model="${rest#k6-create-mcp}"
+  elif [[ "$rest" == mcp-k6* ]]; then
+    skill="mcp-k6"
+    model="${rest#mcp-k6}"
   elif [[ "$rest" == grafana-k6* ]]; then
     skill="grafana-k6"
     model="${rest#grafana-k6}"

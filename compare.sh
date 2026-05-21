@@ -4,7 +4,7 @@
 # Usage:
 #   ./compare.sh                   Run all scenarios against all skills and the default model
 #   ./compare.sh --scenario N      Run only scenario N (1-19, 21-30)
-#   ./compare.sh --skill NAME      Run only one skill (k6-create-mcp, k6-create-xk6docs, or grafana-k6)
+#   ./compare.sh --skill NAME      Run only one skill (mcp-k6, k6-create-xk6docs, or grafana-k6)
 #   ./compare.sh --model M         Run only one model (provider/model format, e.g. anthropic/claude-sonnet-4-20250514)
 #   ./compare.sh --parallel N      Run at most N skill workers in parallel (default: 2)
 #   ./compare.sh --help            Show this help
@@ -595,7 +595,13 @@ generate_script() {
   # The agent runs 'k6 x docs --version v1.6.1' and the extension is fetched
   # from cache automatically. No manual k6-with-docs binary required.
 
-  local full_prompt="Load and follow the $skill skill. Then: $prompt"
+  local full_prompt
+  if [[ "$skill" == "mcp-k6" ]]; then
+    # Raw mcp-k6: no skill loaded — the agent uses MCP tools directly via opencode.json
+    full_prompt="Write a k6 test script. Save it to k6/scripts/<descriptive-name>.js. $prompt"
+  else
+    full_prompt="Load and follow the $skill skill. Then: $prompt"
+  fi
   local model_args=()
   [[ -n "$model" ]] && model_args=(--model "$model")
 
@@ -810,7 +816,7 @@ main() {
 
   local scenarios="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 21 22 23 24 25 26 27 28 29 30"
   [[ -n "$FILTER_SCENARIO" ]] && scenarios="$FILTER_SCENARIO"
-  local skills="k6-create-mcp k6-create-xk6docs grafana-k6"
+  local skills="mcp-k6 k6-create-xk6docs grafana-k6"
   [[ -n "$FILTER_SKILL" ]] && skills="$FILTER_SKILL"
 
   # Models: comma-separated list via --model, or empty string (uses opencode default)
