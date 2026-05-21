@@ -166,7 +166,7 @@ for dir in "${RESULT_DIRS[@]}"; do
 done
 
 # Wait for remaining
-for pid in "${pids[@]}"; do
+for pid in ${pids[@]+"${pids[@]}"}; do
   wait "$pid" || true
 done
 

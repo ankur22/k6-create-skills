@@ -875,7 +875,7 @@ main() {
     done
 
     # Wait for remaining workers
-    for pid in "${pids[@]}"; do
+    for pid in ${pids[@]+"${pids[@]}"}; do
       wait "$pid" || true
     done
 
