@@ -771,8 +771,16 @@ run_skill_worker() {
       mkdir -p "$script_dir/proto"
       cp "$PROTO_DIR/quickpizza.proto" "$script_dir/proto/" 2>/dev/null || true
       local script_name; script_name=$(basename "$script_file")
+      local grpc_exit
       (cd "$script_dir" && "$k6_bin" run --vus 1 --iterations 1 "$script_name" >/dev/null 2>&1) \
-        && valid="pass" || valid="fail"
+        && grpc_exit=0 || grpc_exit=$?
+      if [[ "$grpc_exit" -eq 0 ]]; then
+        valid="pass"
+      elif [[ "$grpc_exit" -eq 99 ]]; then
+        valid="pass(threshold-breach)"
+      else
+        valid="fail"
+      fi
     fi
   else
     valid=$(validate_script_file "$script_file" "$k6_bin" "$scenario_num")
