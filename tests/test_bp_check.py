@@ -98,6 +98,116 @@ export default async function () {
         self.assertEqual(result["max"], 1)
         self.assertIn("script file exists", result["issues"])
 
+    def test_http_request_matches_const_url_pattern(self):
+        # S18 pattern: URL stored in const, then http.post(url) called.
+        code = """
+import http from 'k6/http';
+import { check } from 'k6';
+export const options = {
+  cloud: { projectID: 1234567, name: 'QuickPizza Hybrid Test' },
+  scenarios: {
+    pizza_api: {
+      executor: 'constant-arrival-rate',
+      rate: 15,
+      timeUnit: '1s',
+      duration: '3m',
+      preAllocatedVUs: 30,
+      maxVUs: 100,
+    },
+  },
+};
+export default function () {
+  const url = 'https://quickpizza.grafana.com/api/pizza';
+  const params = { headers: { 'Authorization': 'Token abc1234567890123' } };
+  const res = http.post(url, null, params);
+  check(res, { 'status 200': r => r.status === 200 });
+}
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            script = self.write_script(Path(tmp), "k6/scripts/quickpizza-cloud-local-exec.js", code)
+            result = bp_check.score(str(script), scenario="18", manifest_path=str(MANIFEST), result_dir=tmp)
+
+        pizza_issue = [i for i in result["issues"] if "pizza_post" in i]
+        self.assertEqual(pizza_issue, [], f"unexpected issue for const-URL pattern: {result['issues']}")
+
+    def test_raw_target_finds_content_inside_comments(self):
+        # S17.run_comment lives in a comment header; raw-target rules see it.
+        code = """// QuickPizza Cloud Load Test
+// How to run:
+//   k6 cloud login --token <TOKEN>
+//   k6 cloud run script.js
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+export const options = {
+  cloud: {
+    projectID: 1234567,
+    name: 'QuickPizza Cloud Load Test',
+    distribution: {
+      ash: { loadZone: 'amazon:us:ashburn', percent: 60 },
+      dub: { loadZone: 'amazon:eu:dublin', percent: 40 },
+    },
+  },
+  scenarios: {
+    load_test: {
+      executor: 'ramping-vus',
+      startVUs: 0,
+      stages: [
+        { duration: '2m', target: 50 },
+        { duration: '5m', target: 50 },
+        { duration: '1m', target: 0 },
+      ],
+    },
+  },
+  thresholds: { http_req_duration: ['p(95)<500'] },
+};
+export default function () {
+  const res = http.get('https://quickpizza.grafana.com/api/quotes');
+  check(res, { 'status 200': r => r.status === 200 });
+  sleep(1);
+}
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            script = self.write_script(Path(tmp), "k6/scripts/quickpizza-cloud.js", code)
+            result = bp_check.score(str(script), scenario="17", manifest_path=str(MANIFEST), result_dir=tmp)
+
+        comment_issue = [i for i in result["issues"] if "run_comment" in i]
+        self.assertEqual(comment_issue, [], f"raw-target rule should see comment text: {result['issues']}")
+
+    def test_execution_module_alias_is_flexible(self):
+        # S10: prompt suggests `import execution from 'k6/execution'` but mcp-k6
+        # chose alias `exec`. Manifest should accept either.
+        code = """
+import http from 'k6/http';
+import { check } from 'k6';
+import exec from 'k6/execution';
+export const options = {
+  scenarios: {
+    per_vu: {
+      executor: 'per-vu-iterations',
+      vus: 5,
+      iterations: 3,
+      maxDuration: '2m',
+    },
+  },
+};
+export default function () {
+  const vuId = exec.vu.idInTest;
+  const iter = exec.scenario.iterationInInstance;
+  const res = http.get('https://quickpizza.grafana.com/api/quotes', { tags: { vu: String(vuId) } });
+  check(res, { 'status 200': r => r.status === 200 });
+}
+export function handleSummary(data) {
+  return { stdout: 'done' };
+}
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            script = self.write_script(Path(tmp), "k6/scripts/quickpizza-execution-summary.js", code)
+            result = bp_check.score(str(script), scenario="10", manifest_path=str(MANIFEST), result_dir=tmp)
+
+        adherence = result["categories"].get("prompt_adherence", {})
+        bad = [i for i in adherence.get("issues", []) if "vu_id" in i or "iter_in_instance" in i]
+        self.assertEqual(bad, [], f"alias-flexible checks should pass: {adherence}")
+
 
 if __name__ == "__main__":
     unittest.main()

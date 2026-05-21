@@ -16,6 +16,39 @@
         { "id": "S1.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
       ]
     },
+    "2": {
+      "name": "HTTP authentication flow",
+      "checks": [
+        { "id": "S2.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-auth-flow.js", "description": "saved to requested file path" },
+        { "id": "S2.import_http", "type": "import", "module": "k6/http", "description": "imports k6/http" },
+        { "id": "S2.register_post", "type": "http_request", "method": "post", "path": "/api/users", "description": "POSTs to /api/users to register" },
+        { "id": "S2.login_post", "type": "http_request", "method": "post", "path": "/api/users/token/login", "description": "POSTs to /api/users/token/login" },
+        { "id": "S2.pizza_post", "type": "http_request", "method": "post", "path": "/api/pizza", "description": "POSTs (not GETs) to /api/pizza" },
+        { "id": "S2.ratings_post", "type": "http_request", "method": "post", "path": "/api/ratings", "description": "POSTs to /api/ratings" },
+        { "id": "S2.unique_username", "type": "regex", "pattern": "__VU[\\s\\S]{0,80}Date\\.now\\(\\)|Date\\.now\\(\\)[\\s\\S]{0,80}__VU", "description": "creates a unique username using __VU and Date.now()" },
+        { "id": "S2.token_auth", "type": "regex", "pattern": "Authorization[\\s\\S]{0,40}Token\\s+", "description": "sends Authorization: Token <value>" },
+        { "id": "S2.pizza_id", "type": "regex", "pattern": "pizza\\.id|pizza_id|pizzaId", "description": "uses the returned pizza id" },
+        { "id": "S2.check_used", "type": "regex", "pattern": "\\bcheck\\s*\\(", "description": "asserts with check()" },
+        { "id": "S2.vus", "type": "option_number", "key": "vus", "value": 3, "description": "uses 3 VUs" },
+        { "id": "S2.duration", "type": "option_duration", "key": "duration", "value": "30s", "description": "runs for 30 seconds" }
+      ]
+    },
+    "3": {
+      "name": "Ramping VUs with custom metrics",
+      "checks": [
+        { "id": "S3.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-ramp-metrics.js", "description": "saved to requested file path" },
+        { "id": "S3.import_metrics", "type": "import", "module": "k6/metrics", "description": "imports k6/metrics" },
+        { "id": "S3.executor", "type": "contains", "value": "ramping-vus", "description": "uses ramping-vus executor" },
+        { "id": "S3.stage_30s_10", "type": "regex", "pattern": "duration:\\s*['\"]30s['\"][\\s\\S]{0,80}target:\\s*10|target:\\s*10[\\s\\S]{0,80}duration:\\s*['\"]30s['\"]", "description": "has a 30s → 10 VUs stage" },
+        { "id": "S3.stage_1m_10", "type": "regex", "pattern": "duration:\\s*['\"]1m['\"][\\s\\S]{0,80}target:\\s*10|target:\\s*10[\\s\\S]{0,80}duration:\\s*['\"]1m['\"]", "description": "holds at 10 VUs for 1m" },
+        { "id": "S3.stage_ramp_down", "type": "regex", "pattern": "duration:\\s*['\"]30s['\"][\\s\\S]{0,80}target:\\s*0|target:\\s*0[\\s\\S]{0,80}duration:\\s*['\"]30s['\"]", "description": "ramps down to 0 over 30s" },
+        { "id": "S3.counter_metric", "type": "regex", "pattern": "new\\s+Counter\\s*\\(\\s*['\"]quote_requests['\"]", "description": "defines Counter 'quote_requests'" },
+        { "id": "S3.rate_metric", "type": "regex", "pattern": "new\\s+Rate\\s*\\(\\s*['\"]quote_success_rate['\"]", "description": "defines Rate 'quote_success_rate'" },
+        { "id": "S3.success_threshold", "type": "regex", "pattern": "quote_success_rate[\\s\\S]{0,80}rate\\s*>\\s*0?\\.95", "description": "thresholds quote_success_rate above 95%" },
+        { "id": "S3.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<800", "description": "sets p95 duration threshold under 800ms" },
+        { "id": "S3.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" }
+      ]
+    },
     "4": {
       "name": "WebSocket QuickPizza",
       "checks": [
@@ -53,6 +86,226 @@
         { "id": "S5.duration", "type": "option_duration", "key": "duration", "value": "20s", "description": "runs for 20 seconds" }
       ]
     },
+    "6": {
+      "name": "Browser smoke test",
+      "checks": [
+        { "id": "S6.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-browser.js", "description": "saved to requested file path" },
+        { "id": "S6.browser_import", "type": "import", "module": "k6/browser", "description": "imports k6/browser" },
+        { "id": "S6.shared_iterations", "type": "contains", "value": "shared-iterations", "description": "uses shared-iterations scenario" },
+        { "id": "S6.browser_options", "type": "regex", "pattern": "browser\\s*:\\s*\\{\\s*type\\s*:\\s*['\"]chromium['\"]", "description": "configures chromium browser" },
+        { "id": "S6.async_default", "type": "regex", "pattern": "export\\s+default\\s+async\\s+function", "description": "uses async default function" },
+        { "id": "S6.new_page", "type": "regex", "pattern": "browser\\.newPage\\s*\\(", "description": "creates a page with browser.newPage()" },
+        { "id": "S6.goto", "type": "regex", "pattern": "page\\.goto\\s*\\(\\s*['\"`]https://quickpizza\\.grafana\\.com", "description": "navigates to QuickPizza" },
+        { "id": "S6.button_click", "type": "regex", "pattern": "locator\\s*\\(\\s*['\"]button['\"]\\)\\.first\\s*\\(\\s*\\)\\.click|getByRole\\s*\\(\\s*['\"]button['\"]", "description": "clicks any visible button" },
+        { "id": "S6.wait_load_state", "type": "regex", "pattern": "waitForLoadState\\s*\\(\\s*['\"]networkidle['\"]", "description": "waits for networkidle (per prompt)" },
+        { "id": "S6.title_check", "type": "regex", "pattern": "\\.title\\s*\\(\\s*\\)|toHaveTitle", "description": "checks page title" },
+        { "id": "S6.page_close_finally", "category": "best_practices", "type": "regex", "pattern": "\\bfinally\\s*\\{[\\s\\S]*?page\\.close", "description": "closes page in finally" }
+      ]
+    },
+    "7": {
+      "name": "k6-testing functional HTTP + browser",
+      "checks": [
+        { "id": "S7.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-functional.js", "description": "saved to requested file path" },
+        { "id": "S7.expect_import", "type": "import", "module": "https://jslib.k6.io/k6-testing/0.6.1/index.js", "description": "imports k6-testing expect" },
+        { "id": "S7.browser_import", "type": "import", "module": "k6/browser", "description": "imports k6/browser" },
+        { "id": "S7.http_functional_scenario", "type": "regex", "pattern": "http_functional[\\s\\S]{0,200}exec\\s*:\\s*['\"]httpTest['\"]", "description": "defines http_functional scenario with exec: httpTest" },
+        { "id": "S7.browser_functional_scenario", "type": "regex", "pattern": "browser_functional[\\s\\S]{0,300}exec\\s*:\\s*['\"]browserTest['\"]", "description": "defines browser_functional scenario with exec: browserTest" },
+        { "id": "S7.http_test_export", "type": "regex", "pattern": "export\\s+(?:async\\s+)?function\\s+httpTest\\b", "description": "exports httpTest function" },
+        { "id": "S7.browser_test_export", "type": "regex", "pattern": "export\\s+async\\s+function\\s+browserTest\\b", "description": "exports async browserTest function" },
+        { "id": "S7.http_endpoint", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes in HTTP scenario" },
+        { "id": "S7.status_assert", "type": "regex", "pattern": "expect\\s*\\([\\s\\S]{0,80}status\\b[\\s\\S]{0,40}\\.toEqual\\s*\\(\\s*200", "description": "asserts status equals 200" },
+        { "id": "S7.quotes_defined", "type": "regex", "pattern": "expect\\s*\\([\\s\\S]{0,120}quotes[\\s\\S]{0,40}\\.toBeDefined", "description": "asserts quotes is defined" },
+        { "id": "S7.title_match", "type": "regex", "pattern": "toHaveTitle\\s*\\(\\s*\\/QuickPizza", "description": "asserts page title matches /QuickPizza/" },
+        { "id": "S7.body_visible", "type": "regex", "pattern": "expect\\s*\\(\\s*page\\.locator\\s*\\(\\s*['\"]body['\"]\\s*\\)\\s*\\)\\.toBeVisible", "description": "asserts body is visible" },
+        { "id": "S7.page_close_finally", "category": "best_practices", "type": "regex", "pattern": "\\bfinally\\s*\\{[\\s\\S]*?page\\.close", "description": "closes page in finally" }
+      ]
+    },
+    "8": {
+      "name": "k6/crypto and k6/encoding",
+      "checks": [
+        { "id": "S8.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-crypto-encoding.js", "description": "saved to requested file path" },
+        { "id": "S8.crypto_import", "type": "import", "module": "k6/crypto", "description": "imports k6/crypto" },
+        { "id": "S8.encoding_import", "type": "import", "module": "k6/encoding", "description": "imports k6/encoding" },
+        { "id": "S8.random_bytes", "type": "regex", "pattern": "randomBytes\\s*\\(\\s*16\\s*\\)", "description": "uses randomBytes(16)" },
+        { "id": "S8.b64encode", "type": "regex", "pattern": "encoding\\.b64encode\\s*\\(", "description": "uses encoding.b64encode" },
+        { "id": "S8.hmac_sha256", "type": "regex", "pattern": "hmac\\s*\\(\\s*['\"]sha256['\"]", "description": "computes HMAC-SHA256" },
+        { "id": "S8.hmac_secret", "type": "contains", "value": "secret-key", "description": "uses 'secret-key' as HMAC key" },
+        { "id": "S8.md5_call", "type": "regex", "pattern": "\\bmd5\\s*\\(", "description": "computes MD5" },
+        { "id": "S8.basic_auth", "type": "contains", "value": "testuser:testpass", "description": "encodes Basic Auth credentials" },
+        { "id": "S8.request_id_header", "type": "regex", "pattern": "['\"]X-Request-ID['\"]", "description": "sends X-Request-ID header" },
+        { "id": "S8.basic_auth_header", "type": "regex", "pattern": "Authorization[\\s\\S]{0,40}Basic\\s+", "description": "sends Authorization: Basic header" },
+        { "id": "S8.endpoint", "type": "http_request", "method": "get", "path": "/api/get", "description": "GETs /api/get" },
+        { "id": "S8.vus", "type": "option_number", "key": "vus", "value": 3, "description": "uses 3 VUs" },
+        { "id": "S8.duration", "type": "option_duration", "key": "duration", "value": "20s", "description": "runs for 20 seconds" }
+      ]
+    },
+    "9": {
+      "name": "k6/html and SharedArray",
+      "checks": [
+        { "id": "S9.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-html-data.js", "description": "saved to requested file path" },
+        { "id": "S9.html_import", "type": "import", "module": "k6/html", "description": "imports k6/html" },
+        { "id": "S9.data_import", "type": "import", "module": "k6/data", "description": "imports k6/data" },
+        { "id": "S9.shared_array", "type": "regex", "pattern": "new\\s+SharedArray\\s*\\(\\s*['\"]endpoints['\"]", "description": "defines SharedArray named 'endpoints'" },
+        { "id": "S9.quotes_path", "type": "contains", "value": "/api/quotes", "description": "lists /api/quotes endpoint" },
+        { "id": "S9.names_path", "type": "contains", "value": "/api/names", "description": "lists /api/names endpoint" },
+        { "id": "S9.adjectives_path", "type": "contains", "value": "/api/adjectives", "description": "lists /api/adjectives endpoint" },
+        { "id": "S9.vu_modulo", "type": "regex", "pattern": "__VU[\\s\\S]{0,30}%\\s", "description": "uses __VU modulo array length" },
+        { "id": "S9.login_fetch", "type": "regex", "pattern": "http\\.get\\s*\\([^)]*\\/login\\b", "description": "fetches /login" },
+        { "id": "S9.parse_html", "type": "regex", "pattern": "parseHTML\\s*\\(", "description": "uses parseHTML()" },
+        { "id": "S9.button_find", "type": "regex", "pattern": "find\\s*\\(\\s*['\"]button['\"]\\s*\\)\\.size", "description": "checks doc.find('button').size()" },
+        { "id": "S9.h1_text", "type": "regex", "pattern": "find\\s*\\(\\s*['\"]h1['\"]\\s*\\)\\.text", "description": "reads doc.find('h1').text()" },
+        { "id": "S9.vus", "type": "option_number", "key": "vus", "value": 5, "description": "uses 5 VUs" },
+        { "id": "S9.duration", "type": "option_duration", "key": "duration", "value": "30s", "description": "runs for 30 seconds" }
+      ]
+    },
+    "10": {
+      "name": "k6/execution and handleSummary",
+      "checks": [
+        { "id": "S10.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-execution-summary.js", "description": "saved to requested file path" },
+        { "id": "S10.execution_import", "type": "import", "module": "k6/execution", "description": "imports k6/execution" },
+        { "id": "S10.per_vu_executor", "type": "contains", "value": "per-vu-iterations", "description": "uses per-vu-iterations executor" },
+        { "id": "S10.vus", "type": "option_number", "key": "vus", "value": 5, "description": "uses 5 VUs" },
+        { "id": "S10.iterations", "type": "option_number", "key": "iterations", "value": 3, "description": "runs 3 iterations per VU" },
+        { "id": "S10.max_duration", "type": "regex", "pattern": "maxDuration\\s*:\\s*['\"]2m['\"]", "description": "sets maxDuration: '2m'" },
+        { "id": "S10.vu_id", "type": "regex", "pattern": "\\.vu\\.idInTest\\b", "description": "reads vu.idInTest from execution module" },
+        { "id": "S10.iter_in_instance", "type": "regex", "pattern": "\\.scenario\\.iterationInInstance\\b", "description": "reads scenario.iterationInInstance" },
+        { "id": "S10.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S10.vu_tag", "type": "regex", "pattern": "tags\\s*:\\s*\\{[\\s\\S]{0,80}vu", "description": "tags request with vu" },
+        { "id": "S10.handle_summary", "type": "regex", "pattern": "export\\s+function\\s+handleSummary\\b", "description": "exports handleSummary" },
+        { "id": "S10.summary_stdout", "type": "regex", "pattern": "handleSummary[\\s\\S]*?stdout", "description": "handleSummary returns stdout output" }
+      ]
+    },
+    "11": {
+      "name": "xk6-faker",
+      "checks": [
+        { "id": "S11.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-faker.js", "description": "saved to requested file path" },
+        { "id": "S11.faker_import", "type": "regex", "pattern": "import[\\s\\S]{0,80}Faker[\\s\\S]{0,40}from\\s*['\"]k6\\/x\\/faker['\"]", "description": "imports Faker from k6/x/faker" },
+        { "id": "S11.faker_seed", "type": "regex", "pattern": "new\\s+Faker\\s*\\(\\s*42\\s*\\)", "description": "creates Faker with seed 42" },
+        { "id": "S11.username", "type": "regex", "pattern": "fake\\.internet\\.username\\s*\\(", "description": "generates fake username" },
+        { "id": "S11.unique_username", "type": "regex", "pattern": "__VU[\\s\\S]{0,80}Date\\.now\\(\\)|Date\\.now\\(\\)[\\s\\S]{0,80}__VU", "description": "appends __VU + Date.now() for uniqueness" },
+        { "id": "S11.register", "type": "http_request", "method": "post", "path": "/api/users", "description": "POSTs to /api/users" },
+        { "id": "S11.status_201", "type": "regex", "pattern": "status\\s*===?\\s*201|expect\\s*\\([^)]*status[^)]*\\)\\.toEqual\\s*\\(\\s*201", "description": "checks for status 201" },
+        { "id": "S11.vus", "type": "option_number", "key": "vus", "value": 5, "description": "uses 5 VUs" },
+        { "id": "S11.duration", "type": "option_duration", "key": "duration", "value": "20s", "description": "runs for 20 seconds" }
+      ]
+    },
+    "12": {
+      "name": "xk6-redis cache",
+      "checks": [
+        { "id": "S12.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-redis-cache.js", "description": "saved to requested file path" },
+        { "id": "S12.redis_import", "type": "regex", "pattern": "import\\s+redis\\s+from\\s+['\"]k6\\/x\\/redis['\"]", "description": "imports redis from k6/x/redis" },
+        { "id": "S12.client_url", "type": "regex", "pattern": "new\\s+redis\\.Client\\s*\\(\\s*['\"]redis:\\/\\/localhost:6379['\"]", "description": "uses URL-string constructor for Redis Client" },
+        { "id": "S12.async_default", "type": "regex", "pattern": "export\\s+default\\s+async\\s+function", "description": "uses async default function" },
+        { "id": "S12.cache_get", "type": "regex", "pattern": "await\\s+client\\.get\\s*\\(", "description": "awaits client.get" },
+        { "id": "S12.cache_set_ttl", "type": "regex", "pattern": "client\\.set\\s*\\([^)]*,\\s*[^,]+,\\s*30\\b", "description": "client.set called with 30s TTL" },
+        { "id": "S12.counter_metric", "type": "regex", "pattern": "new\\s+Counter\\s*\\(\\s*['\"]cache_hits['\"]", "description": "defines Counter 'cache_hits'" },
+        { "id": "S12.quotes_endpoint", "type": "contains", "value": "/api/quotes", "description": "fetches /api/quotes" },
+        { "id": "S12.vus", "type": "option_number", "key": "vus", "value": 5, "description": "uses 5 VUs" },
+        { "id": "S12.duration", "type": "option_duration", "key": "duration", "value": "30s", "description": "runs for 30 seconds" }
+      ]
+    },
+    "13": {
+      "name": "xk6-sql sqlite logging",
+      "checks": [
+        { "id": "S13.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-sql-log.js", "description": "saved to requested file path" },
+        { "id": "S13.sql_import", "type": "regex", "pattern": "import\\s+sql\\s+from\\s+['\"]k6\\/x\\/sql['\"]", "description": "imports sql from k6/x/sql" },
+        { "id": "S13.driver_import", "type": "regex", "pattern": "import\\s+driver\\s+from\\s+['\"]k6\\/x\\/sql\\/driver\\/sqlite3['\"]", "description": "imports sqlite3 driver" },
+        { "id": "S13.db_open", "type": "regex", "pattern": "sql\\.open\\s*\\(\\s*driver\\s*,\\s*['\"]\\/tmp\\/quickpizza_results\\.db['\"]", "description": "opens /tmp/quickpizza_results.db" },
+        { "id": "S13.create_table", "type": "regex", "pattern": "CREATE\\s+TABLE\\s+results", "description": "creates results table" },
+        { "id": "S13.insert", "type": "regex", "pattern": "INSERT\\s+INTO\\s+results", "description": "inserts into results table" },
+        { "id": "S13.query_count", "type": "regex", "pattern": "rows\\[0\\]\\.cnt", "description": "reads rows[0].cnt (array, not ResultSet)" },
+        { "id": "S13.teardown", "type": "regex", "pattern": "export\\s+function\\s+teardown\\b", "description": "exports teardown function" },
+        { "id": "S13.vus", "type": "option_number", "key": "vus", "value": 3, "description": "uses 3 VUs" },
+        { "id": "S13.duration", "type": "option_duration", "key": "duration", "value": "20s", "description": "runs for 20 seconds" }
+      ]
+    },
+    "14": {
+      "name": "xk6-dns/tls/tcp infrastructure checks",
+      "checks": [
+        { "id": "S14.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-infra-checks.js", "description": "saved to requested file path" },
+        { "id": "S14.dns_import", "type": "regex", "pattern": "import\\s+dns\\s+from\\s+['\"]k6\\/x\\/dns['\"]", "description": "imports dns" },
+        { "id": "S14.tls_import", "type": "regex", "pattern": "import\\s+tls\\s+from\\s+['\"]k6\\/x\\/tls['\"]", "description": "imports tls" },
+        { "id": "S14.tcp_import", "type": "regex", "pattern": "import\\s+tcp\\s+from\\s+['\"]k6\\/x\\/tcp['\"]", "description": "imports tcp" },
+        { "id": "S14.host_const", "type": "contains", "value": "quickpizza.grafana.com", "description": "targets quickpizza.grafana.com" },
+        { "id": "S14.dns_lookup", "type": "regex", "pattern": "dns\\.lookup\\s*\\(", "description": "calls dns.lookup()" },
+        { "id": "S14.tls_cert", "type": "regex", "pattern": "tls\\.getCertificate\\s*\\(", "description": "calls tls.getCertificate()" },
+        { "id": "S14.cert_expires", "type": "regex", "pattern": "\\.expires\\s*>\\s*Date\\.now", "description": "checks cert.expires > Date.now()" },
+        { "id": "S14.tcp_socket", "type": "regex", "pattern": "new\\s+tcp\\.Socket\\s*\\(", "description": "uses new tcp.Socket()" },
+        { "id": "S14.tcp_connect", "type": "regex", "pattern": "socket\\.connect\\s*\\(\\s*443\\b", "description": "socket.connect(443, host) called" },
+        { "id": "S14.dns_check_export", "type": "regex", "pattern": "export\\s+async\\s+function\\s+dnsCheck\\b", "description": "exports async dnsCheck" },
+        { "id": "S14.tls_check_export", "type": "regex", "pattern": "export\\s+async\\s+function\\s+tlsCheck\\b", "description": "exports async tlsCheck" },
+        { "id": "S14.tcp_check_export", "type": "regex", "pattern": "export\\s+async\\s+function\\s+tcpCheck\\b", "description": "exports async tcpCheck" }
+      ]
+    },
+    "15": {
+      "name": "Dinner-time peak ramping load",
+      "checks": [
+        { "id": "S15.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-dinner-peak.js", "description": "saved to requested file path" },
+        { "id": "S15.executor", "type": "contains", "value": "ramping-vus", "description": "uses ramping-vus executor" },
+        { "id": "S15.stage_5m_5", "type": "regex", "pattern": "duration:\\s*['\"]5m['\"][\\s\\S]{0,80}target:\\s*5\\b|target:\\s*5\\b[\\s\\S]{0,80}duration:\\s*['\"]5m['\"]", "description": "has 5m → 5 VUs morning stage" },
+        { "id": "S15.stage_10m_20", "type": "regex", "pattern": "duration:\\s*['\"]10m['\"][\\s\\S]{0,80}target:\\s*20\\b|target:\\s*20\\b[\\s\\S]{0,80}duration:\\s*['\"]10m['\"]", "description": "has 10m → 20 VUs afternoon stage" },
+        { "id": "S15.stage_15m_60", "type": "regex", "pattern": "duration:\\s*['\"]15m['\"][\\s\\S]{0,80}target:\\s*60\\b|target:\\s*60\\b[\\s\\S]{0,80}duration:\\s*['\"]15m['\"]", "description": "has 15m → 60 VUs surge stage" },
+        { "id": "S15.stage_20m_80", "type": "regex", "pattern": "duration:\\s*['\"]20m['\"][\\s\\S]{0,80}target:\\s*80\\b|target:\\s*80\\b[\\s\\S]{0,80}duration:\\s*['\"]20m['\"]", "description": "has 20m peak at 80 VUs" },
+        { "id": "S15.graceful_ramp_down", "type": "regex", "pattern": "gracefulRampDown\\s*:\\s*['\"]2m['\"]", "description": "sets gracefulRampDown: '2m'" },
+        { "id": "S15.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S15.pizza_post", "type": "http_request", "method": "post", "path": "/api/pizza", "description": "POSTs /api/pizza" },
+        { "id": "S15.token_auth", "type": "contains", "value": "abc1234567890123", "description": "uses Authorization: Token 'abc1234567890123'" },
+        { "id": "S15.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<1000", "description": "sets p95 threshold under 1000ms" },
+        { "id": "S15.failed_threshold", "type": "threshold", "metric": "http_req_failed", "expression": "rate<0.02", "description": "sets failure-rate threshold under 2%" },
+        { "id": "S15.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
+      ]
+    },
+    "16": {
+      "name": "Constant and ramping arrival rate",
+      "checks": [
+        { "id": "S16.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-arrival-rate.js", "description": "saved to requested file path" },
+        { "id": "S16.constant_arrival", "type": "contains", "value": "constant-arrival-rate", "description": "uses constant-arrival-rate executor" },
+        { "id": "S16.ramping_arrival", "type": "contains", "value": "ramping-arrival-rate", "description": "uses ramping-arrival-rate executor" },
+        { "id": "S16.rate_20", "type": "regex", "pattern": "rate\\s*:\\s*20\\b", "description": "constant rate of 20 RPS" },
+        { "id": "S16.constant_duration", "type": "regex", "pattern": "duration\\s*:\\s*['\"]2m['\"]", "description": "constant-arrival-rate runs for 2 minutes" },
+        { "id": "S16.pre_allocated", "type": "regex", "pattern": "preAllocatedVUs\\s*:\\s*40\\b", "description": "preAllocatedVUs: 40" },
+        { "id": "S16.max_vus", "type": "regex", "pattern": "maxVUs\\s*:\\s*100\\b", "description": "maxVUs: 100" },
+        { "id": "S16.ramp_start", "type": "regex", "pattern": "startRate\\s*:\\s*5\\b", "description": "ramping start at 5 RPS" },
+        { "id": "S16.ramp_target_30", "type": "regex", "pattern": "target\\s*:\\s*30\\b", "description": "ramps to 30 RPS" },
+        { "id": "S16.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S16.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<500", "description": "sets p95 threshold under 500ms" },
+        { "id": "S16.failed_threshold", "type": "threshold", "metric": "http_req_failed", "expression": "rate<0.01", "description": "sets failure-rate threshold under 1%" }
+      ]
+    },
+    "17": {
+      "name": "k6 cloud run options",
+      "checks": [
+        { "id": "S17.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-cloud.js", "description": "saved to requested file path" },
+        { "id": "S17.cloud_block", "type": "regex", "pattern": "cloud\\s*:\\s*\\{", "description": "declares top-level cloud block" },
+        { "id": "S17.project_id", "type": "regex", "pattern": "projectID\\s*:\\s*1234567\\b", "description": "sets projectID: 1234567" },
+        { "id": "S17.cloud_name", "type": "contains", "value": "QuickPizza Cloud Load Test", "description": "names the cloud test" },
+        { "id": "S17.ashburn", "type": "contains", "value": "amazon:us:ashburn", "description": "distributes to amazon:us:ashburn" },
+        { "id": "S17.dublin", "type": "contains", "value": "amazon:eu:dublin", "description": "distributes to amazon:eu:dublin" },
+        { "id": "S17.ashburn_60", "type": "regex", "pattern": "amazon:us:ashburn[\\s\\S]{0,80}60\\b|60\\b[\\s\\S]{0,80}amazon:us:ashburn", "description": "60% in us:ashburn" },
+        { "id": "S17.dublin_40", "type": "regex", "pattern": "amazon:eu:dublin[\\s\\S]{0,80}40\\b|40\\b[\\s\\S]{0,80}amazon:eu:dublin", "description": "40% in eu:dublin" },
+        { "id": "S17.executor", "type": "contains", "value": "ramping-vus", "description": "uses ramping-vus executor" },
+        { "id": "S17.stage_50_vus", "type": "regex", "pattern": "target\\s*:\\s*50\\b", "description": "ramps to 50 VUs" },
+        { "id": "S17.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S17.run_comment", "type": "regex", "target": "raw", "pattern": "k6\\s+cloud\\s+(?:login|run)", "description": "includes run instructions comment" }
+      ]
+    },
+    "18": {
+      "name": "k6 cloud --local-execution hybrid",
+      "checks": [
+        { "id": "S18.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-cloud-local-exec.js", "description": "saved to requested file path" },
+        { "id": "S18.cloud_block", "type": "regex", "pattern": "cloud\\s*:\\s*\\{", "description": "declares top-level cloud block" },
+        { "id": "S18.project_id", "type": "regex", "pattern": "projectID\\s*:\\s*1234567\\b", "description": "sets projectID: 1234567" },
+        { "id": "S18.cloud_name", "type": "contains", "value": "QuickPizza Hybrid Test", "description": "names the hybrid test" },
+        { "id": "S18.executor", "type": "contains", "value": "constant-arrival-rate", "description": "uses constant-arrival-rate executor" },
+        { "id": "S18.rate_15", "type": "regex", "pattern": "rate\\s*:\\s*15\\b", "description": "rate: 15 RPS" },
+        { "id": "S18.duration_3m", "type": "regex", "pattern": "duration\\s*:\\s*['\"]3m['\"]", "description": "runs for 3 minutes" },
+        { "id": "S18.pre_allocated", "type": "regex", "pattern": "preAllocatedVUs\\s*:\\s*30\\b", "description": "preAllocatedVUs: 30" },
+        { "id": "S18.max_vus", "type": "regex", "pattern": "maxVUs\\s*:\\s*100\\b", "description": "maxVUs: 100" },
+        { "id": "S18.pizza_post", "type": "http_request", "method": "post", "path": "/api/pizza", "description": "POSTs /api/pizza" },
+        { "id": "S18.token_auth", "type": "contains", "value": "abc1234567890123", "description": "uses Authorization: Token 'abc1234567890123'" },
+        { "id": "S18.local_exec_comment", "type": "regex", "target": "raw", "pattern": "--local-execution", "description": "comment mentions --local-execution" }
+      ]
+    },
     "19": {
       "name": "Browser login and rating functional flow",
       "checks": [
@@ -70,6 +323,109 @@
         { "id": "S19.screenshots", "category": "artifacts", "type": "screenshot_count", "min": 6, "description": "captures at least 6 screenshots across the flow" }
       ]
     },
+    "21": {
+      "name": "HTTP single-iteration smoke",
+      "checks": [
+        { "id": "S21.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-smoke.js", "description": "saved to requested file path" },
+        { "id": "S21.import_http", "type": "import", "module": "k6/http", "description": "imports k6/http" },
+        { "id": "S21.vus_one", "type": "option_number", "key": "vus", "value": 1, "description": "uses 1 VU (via options)" },
+        { "id": "S21.iter_one", "type": "option_number", "key": "iterations", "value": 1, "description": "uses 1 iteration (via options)" },
+        { "id": "S21.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S21.status_check", "type": "regex", "pattern": "status\\s*===?\\s*200", "description": "checks status 200" },
+        { "id": "S21.json_check", "type": "regex", "pattern": "JSON\\.parse|res\\.json\\s*\\(", "description": "validates response body as JSON" },
+        { "id": "S21.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<1000", "description": "sets p95 threshold under 1000ms" }
+      ]
+    },
+    "22": {
+      "name": "Environment-variable parameterization",
+      "checks": [
+        { "id": "S22.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-env-params.js", "description": "saved to requested file path" },
+        { "id": "S22.env_base_url", "type": "contains", "value": "__ENV.BASE_URL", "description": "reads __ENV.BASE_URL" },
+        { "id": "S22.env_token", "type": "contains", "value": "__ENV.AUTH_TOKEN", "description": "reads __ENV.AUTH_TOKEN" },
+        { "id": "S22.env_vus", "type": "contains", "value": "__ENV.TARGET_VUS", "description": "reads __ENV.TARGET_VUS" },
+        { "id": "S22.default_url", "type": "contains", "value": "https://quickpizza.grafana.com", "description": "defaults BASE_URL to quickpizza.grafana.com" },
+        { "id": "S22.default_token", "type": "contains", "value": "abc1234567890123", "description": "defaults AUTH_TOKEN to abc1234567890123" },
+        { "id": "S22.default_vus", "type": "regex", "pattern": "__ENV\\.TARGET_VUS[\\s\\S]{0,40}\\b5\\b|\\b5\\b[\\s\\S]{0,40}__ENV\\.TARGET_VUS", "description": "defaults TARGET_VUS to 5" },
+        { "id": "S22.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S22.names_get", "type": "http_request", "method": "get", "path": "/api/names", "description": "GETs /api/names" },
+        { "id": "S22.token_header", "type": "regex", "pattern": "Authorization[\\s\\S]{0,40}Token\\s+", "description": "sends Authorization: Token header" },
+        { "id": "S22.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<500", "description": "sets p95 threshold under 500ms" },
+        { "id": "S22.failed_threshold", "type": "threshold", "metric": "http_req_failed", "expression": "rate<0.01", "description": "sets failure-rate threshold under 1%" },
+        { "id": "S22.duration", "type": "option_duration", "key": "duration", "value": "30s", "description": "runs for 30 seconds" },
+        { "id": "S22.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
+      ]
+    },
+    "23": {
+      "name": "SharedArray CSV data-driven test",
+      "checks": [
+        { "id": "S23.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-data-driven.js", "description": "saved to requested file path" },
+        { "id": "S23.data_import", "type": "import", "module": "k6/data", "description": "imports k6/data" },
+        { "id": "S23.shared_array", "type": "regex", "pattern": "new\\s+SharedArray\\s*\\(\\s*['\"]endpoints['\"]", "description": "defines SharedArray named 'endpoints'" },
+        { "id": "S23.csv_header", "type": "regex", "pattern": "path[\\s\\S]{0,20}expected_status[\\s\\S]{0,20}description", "description": "inline CSV header" },
+        { "id": "S23.quotes_row", "type": "regex", "pattern": "\\/api\\/quotes[\\s\\S]{0,40}200", "description": "lists /api/quotes,200" },
+        { "id": "S23.names_row", "type": "regex", "pattern": "\\/api\\/names[\\s\\S]{0,40}200", "description": "lists /api/names,200" },
+        { "id": "S23.adjectives_row", "type": "regex", "pattern": "\\/api\\/adjectives[\\s\\S]{0,40}200", "description": "lists /api/adjectives,200" },
+        { "id": "S23.split_parse", "type": "regex", "pattern": "\\.split\\s*\\(|\\.map\\s*\\(", "description": "parses CSV via split/map (not papaparse)" },
+        { "id": "S23.vu_iter_modulo", "type": "regex", "pattern": "__VU[\\s\\S]{0,40}__ITER|__ITER[\\s\\S]{0,40}__VU", "description": "uses __VU and __ITER for selection" },
+        { "id": "S23.expected_check", "type": "contains", "value": "expected_status", "description": "checks against expected_status" },
+        { "id": "S23.description_log", "type": "regex", "pattern": "console\\.log\\s*\\([^)]*description", "description": "logs the description field" },
+        { "id": "S23.vus", "type": "option_number", "key": "vus", "value": 3, "description": "uses 3 VUs" },
+        { "id": "S23.duration", "type": "option_duration", "key": "duration", "value": "30s", "description": "runs for 30 seconds" },
+        { "id": "S23.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<500", "description": "sets p95 threshold under 500ms" }
+      ]
+    },
+    "24": {
+      "name": "Groups and tag-based thresholds",
+      "checks": [
+        { "id": "S24.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-groups-tags.js", "description": "saved to requested file path" },
+        { "id": "S24.group_read", "type": "regex", "pattern": "group\\s*\\(\\s*['\"]read_operations['\"]", "description": "uses group('read_operations')" },
+        { "id": "S24.group_write", "type": "regex", "pattern": "group\\s*\\(\\s*['\"]write_operations['\"]", "description": "uses group('write_operations')" },
+        { "id": "S24.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S24.names_get", "type": "http_request", "method": "get", "path": "/api/names", "description": "GETs /api/names" },
+        { "id": "S24.pizza_post", "type": "http_request", "method": "post", "path": "/api/pizza", "description": "POSTs /api/pizza" },
+        { "id": "S24.tag_read", "type": "regex", "pattern": "operation\\s*:\\s*['\"]read['\"]", "description": "tags read operations" },
+        { "id": "S24.tag_write", "type": "regex", "pattern": "operation\\s*:\\s*['\"]write['\"]", "description": "tags write operations" },
+        { "id": "S24.tag_threshold_read", "type": "regex", "pattern": "http_req_duration\\{operation:read\\}[\\s\\S]{0,80}p\\(95\\)\\s*<\\s*300", "description": "tag-based threshold for read operations p95<300" },
+        { "id": "S24.tag_threshold_write", "type": "regex", "pattern": "http_req_duration\\{operation:write\\}[\\s\\S]{0,80}p\\(95\\)\\s*<\\s*800", "description": "tag-based threshold for write operations p95<800" },
+        { "id": "S24.vus", "type": "option_number", "key": "vus", "value": 5, "description": "uses 5 VUs" },
+        { "id": "S24.duration", "type": "option_duration", "key": "duration", "value": "30s", "description": "runs for 30 seconds" }
+      ]
+    },
+    "25": {
+      "name": "Batch parallel requests",
+      "checks": [
+        { "id": "S25.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-batch.js", "description": "saved to requested file path" },
+        { "id": "S25.batch_call", "type": "regex", "pattern": "http\\.batch\\s*\\(", "description": "uses http.batch()" },
+        { "id": "S25.array_format", "type": "regex", "pattern": "\\[\\s*\\[\\s*['\"]GET['\"]", "description": "uses array-of-arrays format" },
+        { "id": "S25.quotes_in_batch", "type": "contains", "value": "/api/quotes", "description": "batches /api/quotes" },
+        { "id": "S25.names_in_batch", "type": "contains", "value": "/api/names", "description": "batches /api/names" },
+        { "id": "S25.adjectives_in_batch", "type": "contains", "value": "/api/adjectives", "description": "batches /api/adjectives" },
+        { "id": "S25.trend_metric", "type": "regex", "pattern": "new\\s+Trend\\s*\\(\\s*['\"]batch_duration['\"]", "description": "defines Trend 'batch_duration'" },
+        { "id": "S25.timing_capture", "type": "regex", "pattern": "Date\\.now\\s*\\(\\s*\\)", "description": "captures timing with Date.now()" },
+        { "id": "S25.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<500", "description": "sets p95 threshold under 500ms" },
+        { "id": "S25.failed_threshold", "type": "threshold", "metric": "http_req_failed", "expression": "rate<0.01", "description": "sets failure-rate threshold under 1%" },
+        { "id": "S25.batch_threshold", "type": "regex", "pattern": "batch_duration[\\s\\S]{0,80}p\\(95\\)\\s*<\\s*1000", "description": "batch_duration p95 threshold under 1000ms" },
+        { "id": "S25.vus", "type": "option_number", "key": "vus", "value": 5, "description": "uses 5 VUs" },
+        { "id": "S25.duration", "type": "option_duration", "key": "duration", "value": "30s", "description": "runs for 30 seconds" },
+        { "id": "S25.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
+      ]
+    },
+    "26": {
+      "name": "Spike test",
+      "checks": [
+        { "id": "S26.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-spike.js", "description": "saved to requested file path" },
+        { "id": "S26.executor", "type": "contains", "value": "ramping-vus", "description": "uses ramping-vus executor" },
+        { "id": "S26.stage_spike", "type": "regex", "pattern": "duration:\\s*['\"]10s['\"][\\s\\S]{0,80}target:\\s*200\\b|target:\\s*200\\b[\\s\\S]{0,80}duration:\\s*['\"]10s['\"]", "description": "spikes to 200 VUs over 10s" },
+        { "id": "S26.stage_hold_spike", "type": "regex", "pattern": "duration:\\s*['\"]30s['\"][\\s\\S]{0,80}target:\\s*200\\b|target:\\s*200\\b[\\s\\S]{0,80}duration:\\s*['\"]30s['\"]", "description": "holds 200 VUs for 30s" },
+        { "id": "S26.stage_baseline", "type": "regex", "pattern": "target:\\s*2\\b", "description": "has baseline of 2 VUs" },
+        { "id": "S26.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S26.status_check", "type": "regex", "pattern": "status\\s*===?\\s*200", "description": "checks status 200" },
+        { "id": "S26.body_quotes", "type": "regex", "pattern": "body[\\s\\S]{0,40}quotes|includes\\s*\\(\\s*['\"]quotes['\"]", "description": "checks body contains 'quotes'" },
+        { "id": "S26.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<2000", "description": "sets p95 threshold under 2000ms" },
+        { "id": "S26.failed_threshold", "type": "threshold", "metric": "http_req_failed", "expression": "rate<0.05", "description": "sets failure-rate threshold under 5%" },
+        { "id": "S26.tight_sleep", "type": "regex", "pattern": "sleep\\s*\\(\\s*0?\\.5\\s*\\)", "description": "uses tight sleep(0.5)" }
+      ]
+    },
     "27": {
       "name": "Multipart file upload",
       "checks": [
@@ -85,6 +441,57 @@
         { "id": "S27.vus", "type": "option_number", "key": "vus", "value": 2, "description": "uses 2 VUs" },
         { "id": "S27.duration", "type": "option_duration", "key": "duration", "value": "20s", "description": "runs for 20 seconds" },
         { "id": "S27.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
+      ]
+    },
+    "28": {
+      "name": "Custom handleSummary multi-format",
+      "checks": [
+        { "id": "S28.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-custom-summary.js", "description": "saved to requested file path" },
+        { "id": "S28.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S28.successful_counter", "type": "regex", "pattern": "new\\s+Counter\\s*\\(\\s*['\"]successful_requests['\"]", "description": "defines Counter 'successful_requests'" },
+        { "id": "S28.handle_summary", "type": "regex", "pattern": "export\\s+function\\s+handleSummary\\b", "description": "exports handleSummary" },
+        { "id": "S28.summary_stdout", "type": "regex", "pattern": "handleSummary[\\s\\S]*?stdout", "description": "handleSummary returns stdout" },
+        { "id": "S28.summary_json_file", "type": "regex", "pattern": "['\"]\\/tmp\\/quickpizza-summary\\.json['\"]", "description": "writes /tmp/quickpizza-summary.json" },
+        { "id": "S28.duration_threshold", "type": "threshold", "metric": "http_req_duration", "expression": "p(95)<500", "description": "sets p95 threshold under 500ms" },
+        { "id": "S28.vus", "type": "option_number", "key": "vus", "value": 3, "description": "uses 3 VUs" },
+        { "id": "S28.duration", "type": "option_duration", "key": "duration", "value": "20s", "description": "runs for 20 seconds" },
+        { "id": "S28.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
+      ]
+    },
+    "29": {
+      "name": "abortOnFail thresholds",
+      "checks": [
+        { "id": "S29.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-abort-thresholds.js", "description": "saved to requested file path" },
+        { "id": "S29.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S29.body_quotes", "type": "regex", "pattern": "body[\\s\\S]{0,40}quotes|includes\\s*\\(\\s*['\"]quotes['\"]", "description": "checks body contains 'quotes'" },
+        { "id": "S29.abort_on_fail", "type": "regex", "pattern": "abortOnFail\\s*:\\s*true", "description": "uses abortOnFail: true thresholds" },
+        { "id": "S29.delay_abort_eval", "type": "regex", "pattern": "delayAbortEval\\s*:\\s*['\"]10s['\"]", "description": "uses delayAbortEval: '10s'" },
+        { "id": "S29.duration_99", "type": "regex", "pattern": "p\\(99\\)\\s*<\\s*3000", "description": "thresholds p(99) duration under 3000ms" },
+        { "id": "S29.failed_threshold", "type": "regex", "pattern": "rate\\s*<\\s*0?\\.10?\\b", "description": "thresholds failure rate under 10%" },
+        { "id": "S29.checks_threshold", "type": "regex", "pattern": "checks[\\s\\S]{0,120}rate\\s*>\\s*0?\\.9", "description": "thresholds checks rate above 90%" },
+        { "id": "S29.duration_95", "type": "regex", "pattern": "p\\(95\\)\\s*<\\s*500\\b", "description": "non-aborting p(95) duration under 500ms" },
+        { "id": "S29.executor", "type": "contains", "value": "ramping-vus", "description": "uses ramping-vus executor" },
+        { "id": "S29.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
+      ]
+    },
+    "30": {
+      "name": "Multi-stage stress test",
+      "checks": [
+        { "id": "S30.file_path", "category": "artifacts", "type": "file_path", "path": "k6/scripts/quickpizza-stress-test.js", "description": "saved to requested file path" },
+        { "id": "S30.executor", "type": "contains", "value": "ramping-vus", "description": "uses ramping-vus executor" },
+        { "id": "S30.stage_warm", "type": "regex", "pattern": "duration:\\s*['\"]2m['\"][\\s\\S]{0,80}target:\\s*10\\b|target:\\s*10\\b[\\s\\S]{0,80}duration:\\s*['\"]2m['\"]", "description": "warms up with 2m → 10 VUs" },
+        { "id": "S30.stage_50", "type": "regex", "pattern": "target:\\s*50\\b", "description": "ramps to 50 VUs" },
+        { "id": "S30.stage_100", "type": "regex", "pattern": "target:\\s*100\\b", "description": "ramps to 100 VUs" },
+        { "id": "S30.stage_200", "type": "regex", "pattern": "target:\\s*200\\b", "description": "ramps to 200 VUs" },
+        { "id": "S30.stage_300", "type": "regex", "pattern": "target:\\s*300\\b", "description": "ramps to 300 VUs (breaking point)" },
+        { "id": "S30.graceful_ramp_down", "type": "regex", "pattern": "gracefulRampDown\\s*:\\s*['\"]2m['\"]", "description": "sets gracefulRampDown: '2m'" },
+        { "id": "S30.quotes_get", "type": "http_request", "method": "get", "path": "/api/quotes", "description": "GETs /api/quotes" },
+        { "id": "S30.names_get", "type": "http_request", "method": "get", "path": "/api/names", "description": "GETs /api/names" },
+        { "id": "S30.duration_p95", "type": "regex", "pattern": "p\\(95\\)\\s*<\\s*1500\\b", "description": "p(95) threshold under 1500ms" },
+        { "id": "S30.duration_p99", "type": "regex", "pattern": "p\\(99\\)\\s*<\\s*3000\\b", "description": "p(99) threshold under 3000ms" },
+        { "id": "S30.failed_threshold", "type": "regex", "pattern": "rate\\s*<\\s*0?\\.10?\\b", "description": "failure rate threshold under 10%" },
+        { "id": "S30.acceptable_latency_metric", "type": "regex", "pattern": "new\\s+Rate\\s*\\(\\s*['\"]acceptable_latency['\"]", "description": "defines Rate 'acceptable_latency'" },
+        { "id": "S30.sleep", "type": "regex", "pattern": "\\bsleep\\s*\\(", "description": "includes sleep() pacing" }
       ]
     }
   }
