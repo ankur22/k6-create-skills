@@ -1,12 +1,12 @@
 # k6 Authoring Skills
 
-Two [OpenCode](https://opencode.ai) agent skills for writing k6 test scripts, plus a comparison harness to measure accuracy and token cost.
+[OpenCode](https://opencode.ai) agent skills for writing k6 test scripts, plus a comparison harness to measure accuracy and token cost.
 
 ## Skills
 
-### `k6-create-mcp` — uses [mcp-k6](https://github.com/grafana/mcp-k6)
+### `mcp-k6` — raw [mcp-k6](https://github.com/grafana/mcp-k6) MCP server (no skill)
 
-The agent looks up k6 documentation, type definitions, and validates scripts via the mcp-k6 MCP server.
+No skill wrapper — the agent uses the mcp-k6 MCP server tools directly (docs lookup, validation, execution) with no orchestration instructions. This tests whether the MCP server is self-sufficient.
 
 **Requires:** mcp-k6 configured as an MCP server (e.g. via Docker):
 ```json
@@ -42,16 +42,18 @@ npx skills add ankur22/k6-create-skills
 # Install the xk6docs skill only
 npx skills add ankur22/k6-create-skills --skill k6-create-xk6docs
 
-# Install the mcp skill only
-npx skills add ankur22/k6-create-skills --skill k6-create-mcp
+# Install the grafana-k6 skill only
+npx skills add ankur22/k6-create-skills --skill grafana-k6
 ```
 
 **Manually:**
 
 ```bash
-cp -r .agents/skills/k6-create-mcp     ~/.agents/skills/
 cp -r .agents/skills/k6-create-xk6docs ~/.agents/skills/
+cp -r .agents/skills/grafana-k6        ~/.agents/skills/
 ```
+
+For the raw mcp-k6 condition (no skill), just configure the MCP server in `opencode.json` — no skill installation needed.
 
 Then in any project, just ask your agent:
 
@@ -61,33 +63,15 @@ The right skill is loaded automatically based on what's configured.
 
 ## Comparison results
 
-**20 scenarios — 40/40 pass.** All tests target [QuickPizza](https://quickpizza.grafana.com).
+**29 scenarios × 3 conditions.** All tests target [QuickPizza](https://quickpizza.grafana.com).
 
-| Scenario | mcp valid | mcp BP | mcp tokens | xk6docs valid | xk6docs BP | xk6docs tokens |
-|----------|:---------:|:------:|:----------:|:-------------:|:----------:|:--------------:|
-| S1: HTTP basic load | ✅ | 10/10 | 32,891 | ✅ | 10/10 | 24,974 |
-| S2: HTTP auth flow | ✅ | 10/10 | 29,500 | ✅ | 10/10 | 25,149 |
-| S3: Ramping + custom metrics | ✅ | 10/10 | 45,603 | ✅ | 10/10 | 26,416 |
-| S4: WebSocket | ✅ | 8/10 | 33,999 | ✅ | 9/10 | 23,888 |
-| S5: gRPC | ✅ | 10/10 | 30,038 | ✅ | 10/10 | 23,253 |
-| S6: Browser | ✅ | 10/10 | 27,578 | ✅ | 9/10 | 24,865 |
-| S7: k6-testing functional | ✅ | 10/10 | 62,132 | ✅ | 10/10 | 26,682 |
-| S8: k6/crypto + encoding | ✅ | 10/10 | 42,456 | ✅ | 10/10 | 23,910 |
-| S9: HTML parsing + SharedArray | ✅ | 10/10 | 38,931 | ✅ | 10/10 | 24,742 |
-| S10: execution + handleSummary | ✅ | 10/10 | 46,252 | ✅ | 9/10 | 25,164 |
-| S11: xk6-faker | ✅ | 10/10 | 34,872 | ✅ | 10/10 | 41,252 |
-| S12: xk6-redis | ✅ | 10/10 | 33,856 | ✅ | 10/10 | 26,784 |
-| S13: xk6-sql + sqlite3 | ✅ | 10/10 | 37,265 | ✅ | 9/10 | 22,352 |
-| S14: xk6-dns + tls + tcp | ✅ | 10/10 | 33,592 | ✅ | 10/10 | 27,339 |
-| S15: Dinner-time peak (ramping) | ✅ | 10/10 | 46,425 | ✅ | 10/10 | 24,589 |
-| S16: Constant arrival rate | ✅ | 9/10 | 41,771 | ✅ | 10/10 | 29,115 |
-| S17: k6 cloud run | ✅ | 10/10 | 51,922 | ✅ | 10/10 | 21,807 |
-| S18: k6 cloud --local-execution | ✅ | 9/10 | 45,024 | ✅ | 9/10 | 22,907 |
-| S19: Browser login flow | ✅ | 10/10 | 84,846 | ✅ | 9/10 | 42,296 |
-| S20: Binary file download | ✅ | 9/10 | 69,957 | ✅ | 9/10 | 46,001 |
-| **Total / average** | **20/20** | **9.75/10** | **869k** | **20/20** | **9.65/10** | **553k** |
+| Condition | Valid | BP Score (avg) | Tokens (avg) | LLM Judge (avg /25) |
+|-----------|:-----:|:--------------:|:------------:|:-------------------:|
+| **mcp-k6** (raw, no skill) | 29/29 | 9.7/10 | ~59k | 24.0 |
+| **k6-create-xk6docs** | 28/28 | 9.9/10 | ~34k | 24.2 |
+| **grafana-k6** | 29/29 | 9.7/10 | ~41k | 24.2 |
 
-**xk6docs uses 36% fewer tokens overall.** Both skills produce scripts that pass k6 validation with near-identical best-practices scores (9.65 vs 9.75 out of 10).
+Quality is a three-way tie (24.0–24.2/25). The raw MCP server is self-sufficient but costs 74% more tokens than xk6docs. The pure skill (grafana-k6) matches MCP quality with no external dependencies.
 
 ### Best-practices checker (`bp-check.py`)
 
@@ -111,7 +95,7 @@ Each generated script is scored against 10 rules:
 ```bash
 # Prerequisites
 brew install k6 xk6 jq python3
-docker pull grafana/mcp-k6
+docker pull grafana/mcp-k6   # needed for the raw mcp-k6 condition
 
 # Build extension binaries (for xk6 extension scenarios)
 xk6 build --with github.com/grafana/xk6-faker@latest -o /tmp/k6-faker
@@ -124,13 +108,13 @@ xk6 build --with github.com/grafana/xk6-dns@latest  \
 CGO_ENABLED=1 xk6 build --with github.com/grafana/xk6-sql@latest \
            --with github.com/grafana/xk6-sql-driver-sqlite3@latest -o /tmp/k6-sql-sqlite
 
-# Run all 20 scenarios against both skills (parallel execution)
+# Run all 29 scenarios against all 3 conditions (parallel execution)
 export ANTHROPIC_API_KEY=<your-key>
 bash compare.sh
 
 # Run a single scenario
 bash compare.sh --scenario 19
-bash compare.sh --scenario 1 --skill k6-create-xk6docs
+bash compare.sh --scenario 1 --skill mcp-k6
 
 # Check a script against best practices
 python3 bp-check.py k6/scripts/my-test.js

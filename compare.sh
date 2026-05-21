@@ -4,7 +4,7 @@
 # Usage:
 #   ./compare.sh                   Run all scenarios against all skills and the default model
 #   ./compare.sh --scenario N      Run only scenario N (1-19, 21-30)
-#   ./compare.sh --skill NAME      Run only one skill (k6-create-mcp, k6-create-xk6docs, or grafana-k6)
+#   ./compare.sh --skill NAME      Run only one skill (mcp-k6, k6-create-xk6docs, or grafana-k6)
 #   ./compare.sh --model M         Run only one model (provider/model format, e.g. anthropic/claude-sonnet-4-20250514)
 #   ./compare.sh --parallel N      Run at most N skill workers in parallel (default: 2)
 #   ./compare.sh --help            Show this help
@@ -595,7 +595,20 @@ generate_script() {
   # The agent runs 'k6 x docs --version v1.6.1' and the extension is fetched
   # from cache automatically. No manual k6-with-docs binary required.
 
-  local full_prompt="Load and follow the $skill skill. Then: $prompt"
+  # Common constraint: never browse the target site — write the script from docs/knowledge
+  local no_browser="Do NOT use any chrome-devtools tools (no clicking, navigating, or screenshotting the target site). Write the k6 script from documentation and skill knowledge only."
+
+  local full_prompt
+  if [[ "$skill" == "mcp-k6" ]]; then
+    # Raw mcp-k6: no skill, no chrome-devtools — MCP tools only
+    full_prompt="IMPORTANT: Do NOT load any skills. Do NOT use the skill tool. ${no_browser} Write a k6 test script using only the mcp-k6 MCP server tools (list_sections, get_documentation, validate_script, run_script) and standard file tools. Save it to k6/scripts/<descriptive-name>.js. $prompt"
+  elif [[ "$skill" == "grafana-k6" ]]; then
+    # grafana-k6: skill only — no MCP tools, no chrome-devtools
+    full_prompt="IMPORTANT: Do NOT use any k6 MCP server tools (k6_list_sections, k6_get_documentation, k6_validate_script, k6_run_script). ${no_browser} Validate scripts using 'k6 run' or 'k6 inspect' via bash. Load and follow the $skill skill. Then: $prompt"
+  else
+    # k6-create-xk6docs: skill only — no chrome-devtools
+    full_prompt="IMPORTANT: ${no_browser} Load and follow the $skill skill. Then: $prompt"
+  fi
   local model_args=()
   [[ -n "$model" ]] && model_args=(--model "$model")
 
@@ -752,9 +765,9 @@ run_skill_worker() {
   tokens="${tokens:-n/a}"
   echo "$assistant_text" > "$run_dir/response.md"
 
-  # Extract script from response
+  # Extract script from response (tolerate broken-pipe on large outputs)
   local script_content
-  script_content=$(extract_script "$assistant_text")
+  script_content=$(extract_script "$assistant_text") || true
   local generated_js="$run_dir/generated.js"
   [[ -n "$script_content" ]] && echo "$script_content" > "$generated_js"
 
@@ -771,8 +784,16 @@ run_skill_worker() {
       mkdir -p "$script_dir/proto"
       cp "$PROTO_DIR/quickpizza.proto" "$script_dir/proto/" 2>/dev/null || true
       local script_name; script_name=$(basename "$script_file")
+      local grpc_exit
       (cd "$script_dir" && "$k6_bin" run --vus 1 --iterations 1 "$script_name" >/dev/null 2>&1) \
-        && valid="pass" || valid="fail"
+        && grpc_exit=0 || grpc_exit=$?
+      if [[ "$grpc_exit" -eq 0 ]]; then
+        valid="pass"
+      elif [[ "$grpc_exit" -eq 99 ]]; then
+        valid="pass(threshold-breach)"
+      else
+        valid="fail"
+      fi
     fi
   else
     valid=$(validate_script_file "$script_file" "$k6_bin" "$scenario_num")
@@ -802,7 +823,7 @@ main() {
 
   local scenarios="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 21 22 23 24 25 26 27 28 29 30"
   [[ -n "$FILTER_SCENARIO" ]] && scenarios="$FILTER_SCENARIO"
-  local skills="k6-create-mcp k6-create-xk6docs grafana-k6"
+  local skills="mcp-k6 k6-create-xk6docs grafana-k6"
   [[ -n "$FILTER_SKILL" ]] && skills="$FILTER_SKILL"
 
   # Models: comma-separated list via --model, or empty string (uses opencode default)
@@ -875,7 +896,7 @@ main() {
     done
 
     # Wait for remaining workers
-    for pid in "${pids[@]}"; do
+    for pid in ${pids[@]+"${pids[@]}"}; do
       wait "$pid" || true
     done
 
