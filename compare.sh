@@ -599,6 +599,9 @@ generate_script() {
   if [[ "$skill" == "mcp-k6" ]]; then
     # Raw mcp-k6: no skill loaded — the agent uses MCP tools directly via opencode.json
     full_prompt="IMPORTANT: Do NOT load any skills. Do NOT use the skill tool. Write a k6 test script using only the mcp-k6 MCP server tools (list_sections, get_documentation, validate_script, run_script) and standard file tools. Save it to k6/scripts/<descriptive-name>.js. $prompt"
+  elif [[ "$skill" == "grafana-k6" ]]; then
+    # grafana-k6: skill only — no MCP tools
+    full_prompt="IMPORTANT: Do NOT use any k6 MCP server tools (k6_list_sections, k6_get_documentation, k6_validate_script, k6_run_script). Validate scripts using 'k6 run' or 'k6 inspect' via bash. Load and follow the $skill skill. Then: $prompt"
   else
     full_prompt="Load and follow the $skill skill. Then: $prompt"
   fi
