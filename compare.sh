@@ -624,20 +624,19 @@ extract_tokens() { jq -r 'select(.type == "step_finish") | .part.tokens.total' 2
 
 extract_script() {
   local text="$1"
-  echo "$text" | python3 - <<'PYEOF'
+  python3 -c '
 import sys, re
 text = sys.stdin.read()
-for m in re.finditer(r'```[^\n]*\n(.*?)```', text, re.DOTALL):
+for m in re.finditer(r"```[^\n]*\n(.*?)```", text, re.DOTALL):
     block = m.group(1)
-    if 'import ' in block or 'export ' in block or 'export default' in block:
+    if "import " in block or "export " in block or "export default" in block:
         print(block.rstrip())
         sys.exit(0)
 if text:
-    # Fall back to first block
-    m = re.search(r'```[^\n]*\n(.*?)```', text, re.DOTALL)
+    m = re.search(r"```[^\n]*\n(.*?)```", text, re.DOTALL)
     if m:
         print(m.group(1).rstrip())
-PYEOF
+' <<< "$text"
 }
 
 # ── Script finder — agent-written files take priority over response extraction ─
@@ -657,6 +656,7 @@ find_script_file() {
   [[ -n "$written" ]] && { echo "$written"; return; }
 
   [[ -f "$gen" ]] && echo "$gen"
+  return 0
 }
 
 # ── Validation ────────────────────────────────────────────────────────────────
@@ -772,7 +772,7 @@ run_skill_worker() {
   [[ -n "$script_content" ]] && echo "$script_content" > "$generated_js"
 
   local script_file
-  script_file=$(find_script_file "$run_dir")
+  script_file=$(find_script_file "$run_dir" || true)
 
   # Validate
   local valid
@@ -798,15 +798,20 @@ run_skill_worker() {
   else
     valid=$(validate_script_file "$script_file" "$k6_bin" "$scenario_num")
   fi
+  echo "$valid" > "$run_dir/validation.txt"
 
   # Best-practices static score
   local bp_score="n/a"
-  if [[ -n "$script_file" && -f "$script_file" ]]; then
-    bp_raw=$(python3 "$SCRIPT_DIR/bp-check.py" "$script_file" 2>/dev/null)
-    bp_score=$(echo "$bp_raw" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d['score']}/{d['max']}\")" 2>/dev/null || echo "n/a")
-    bp_issues=$(echo "$bp_raw" | python3 -c "import sys,json; d=json.load(sys.stdin); print(', '.join(d['issues']) or 'none')" 2>/dev/null || echo "")
-    [[ -n "$bp_issues" && "$bp_issues" != "none" ]] && echo "    bp_issues: $bp_issues" >&2
-  fi
+  local bp_raw=""
+  local bp_issues=""
+  local bp_args=()
+  [[ -n "$script_file" && -f "$script_file" ]] && bp_args+=("$script_file")
+  bp_args+=(--scenario "$scenario_num" --manifest "$SCRIPT_DIR/scenario-manifest.json" --result-dir "$run_dir")
+  bp_raw=$(python3 "$SCRIPT_DIR/bp-check.py" "${bp_args[@]}" 2>/dev/null || true)
+  [[ -n "$bp_raw" ]] && echo "$bp_raw" > "$run_dir/bp.json"
+  bp_score=$(echo "$bp_raw" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d['score']}/{d['max']}\")" 2>/dev/null || echo "n/a")
+  bp_issues=$(echo "$bp_raw" | python3 -c "import sys,json; d=json.load(sys.stdin); print(', '.join(d.get('issues', [])) or 'none')" 2>/dev/null || echo "")
+  [[ -n "$bp_issues" && "$bp_issues" != "none" ]] && echo "    bp_issues: $bp_issues" >&2
 
   echo "    valid=$valid tokens=$tokens bp=$bp_score duration=${duration}s" >&2
 
