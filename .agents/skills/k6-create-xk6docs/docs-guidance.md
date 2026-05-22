@@ -5,8 +5,16 @@ Use this file when you need to look up k6 documentation with the docs subcommand
 
 > **Important:** `DOCS_CMD` must include the `script` TTY wrapper set up in
 > Step 3. Without it, every invocation returns a generic "browse files" guide
-> instead of actual content. Redirect stderr to suppress AER log lines:
-> `$DOCS_CMD <path> 2>/dev/null`
+> instead of actual content.
+>
+> Two rules that must both be followed on every call:
+> 1. **Redirect stderr** — AER provisioning log lines go to stderr; merging them
+>    with `2>&1` injects noise before the content and can cause the preamble to
+>    look like a failure: `$DOCS_CMD <path> 2>/dev/null`
+> 2. **Never pipe through `head`** — docs pages are long; truncating with
+>    `| head -N` cuts off the actual API content and leaves only the preamble,
+>    making the output look like the "browse files" fallback even when the tool
+>    is working correctly.
 
 ---
 
